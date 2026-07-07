@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>廠務維修系統 - 主管派工</title>
+  <!-- 導入穩定版 Tailwind CSS 進行現代化美觀排版 -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 導入 LINE 官方 LIFF SDK -->
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+</head>
+<body class="bg-slate-50 min-h-screen flex flex-col justify-between p-4 font-sans text-slate-800">
+
+  <!-- 案件主要卡片區塊 -->
+  <div class="bg-white p-6 rounded-2xl shadow-sm max-w-md w-full mx-auto mt-6 border border-slate-100">
+    <div class="border-b pb-4 mb-5 border-slate-100 flex justify-between items-start">
+      <div>
+        <span class="bg-amber-100 text-amber-800 text-xs font-bold px-2.5 py-1 rounded-md uppercase" id="caseStatus">讀取中...</span>
+        <h1 class="text-xl font-bold mt-2 text-slate-900" id="caseId">案件讀取中...</h1>
+      </div>
+    </div>
+
+    <!-- 案件詳細圖文欄位 -->
+    <div class="space-y-4">
+      <div>
+        <label class="text-xs text-slate-400 block font-semibold tracking-wider mb-1">📍 設備位置</label>
+        <p class="text-base font-medium text-slate-700" id="caseLoc">-</p>
+      </div>
+      <div>
+        <label class="text-xs text-slate-400 block font-semibold tracking-wider mb-1">🏷️ 問題分類</label>
+        <p class="text-base font-medium text-slate-700" id="caseCat">-</p>
+      </div>
+      <div>
+        <label class="text-xs text-slate-400 block font-semibold tracking-wider mb-1">📝 問題詳細描述</label>
+        <p class="text-slate-600 text-sm whitespace-pre-line bg-slate-50 p-4 rounded-xl mt-1 border border-slate-100 leading-relaxed" id="caseDesc">-</p>
+      </div>
+    </div>
+
+    <!-- 免清單指派大按鈕 -->
+    <button id="assignBtn" disabled class="mt-8 w-full bg-slate-300 text-slate-500 font-bold py-3.5 px-4 rounded-xl shadow-sm cursor-not-allowed transition duration-200">
+      正在加載案件資料...
+    </button>
+  </div>
+
+  <!-- 頁尾宣告 -->
+  <p class="text-center text-xs text-slate-400 mt-6 mb-4 tracking-wide">廠務報修系統 • 安全行號鎖定保護中</p>
+
+  <script>
+    // ⚠️ 關鍵設定 1：請置換成您 GAS 部署後產生的「網頁應用程式 URL」(必須以 /exec 結尾)
+    const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzDUVDIjJhsRb80RDarCrFjoAc6vTjHZzM8rUb4ubGJNcrrDYgsXFbu7sgpIxIJ9xFG/exec";
+    
+    let currentCase = null;
+    let adminProfile = null;
+
+    async function initLiff() {
+      try {
+        // ⚠️ 關鍵設定 2：請輸入您在 LINE Developers 後台申請到的 LIFF ID
+        await liff.init({ liffId: "2010634850-wuUwaKpv" });
+        
+        if (!liff.isLoggedIn()) {
+          liff.login();
+          return;
+        }
+        
+        // 抓取點擊此網頁的主管 LINE 個人資訊
+        adminProfile = await liff.getProfile();
+        
+        // 解析 LINE 傳過來的網址參數 (?caseId=xxxx)
+        const urlParams = new URLSearchParams(window.location.search);
+        const caseId = urlParams.get('caseId');
+        
+        if (!caseId) {
+          alert("錯誤：網頁連結未帶入案件編號！");
+          return;
+        }
+
+        // 向後端 GAS 發出請求，抓取這筆案件的最新狀態
+        const response = await fetch(`${GAS_WEBAPP_URL}?action=getCase&caseId=${caseId}`);
+        currentCase = await response.json();
+
+        if (currentCase.success) {
+          document.getElementById('caseId').innerText = currentCase.caseId;
+          document.getElementById('caseLoc').innerText = currentCase.location;
+          document.getElementById('caseCat').innerText = currentCase.category;
+          document.getElementById('caseDesc').innerText = currentCase.desc;
+          document.getElementById('caseStatus').innerText = currentCase.status;
+
+          const btn = document.getElementById('assignBtn');
+          if (currentCase.status === '待指派') {
+            document.getElementById('caseStatus').className = "bg-amber-100 text-amber-800 text-xs font-bold px-2.5 py-1 rounded-md";
+            btn.innerText = "🚀 確定指派 (直接分享至 LINE 聯絡人)";
+            btn.className = "mt-8 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition duration-200 cursor-pointer text-center";
+            btn.disabled = false;
+            btn.onclick = startAssignment;
+          } else {
+            document.getElementById('caseStatus').className = "bg-slate-200 text-slate-600 text-xs font-bold px-2.5 py-1 rounded-md";
+            btn.innerText = `此案件已被處理 (${currentCase.status})`;
+            btn.className = "mt-8 w-full bg-slate-200 text-slate-400 font-bold py-3.5 px-4 rounded-xl cursor-not-allowed";
+          }
+        } else {
+          alert("讀取案件失敗：" + currentCase.message);
+        }
+      } catch (err) {
+        alert("LIFF 載入發生異常: " + err);
+      }
+    }
+
+    // 觸發搶單鎖定與直接分享功能
+    async function startAssignment() {
+      const btn = document.getElementById('assignBtn');
+      btn.disabled = true;
+      btn.innerText = "正在進行行號鎖定與同步...";
+
+      try {
+        // A. 前往後端 GAS 爭奪控制權（防搶單鎖定機制）
+        const res = await fetch(`${GAS_WEBAPP_URL}?action=assignCase&caseId=${currentCase.caseId}&adminName=${encodeURIComponent(adminProfile.displayName)}`);
+        const result = await res.json();
+
+        if (!result.success) {
+          alert("❌ " + result.message);
+          window.location.reload(); // 搶單失敗，自動重整刷新最新狀態
+          return;
+        }
+
+        // B. 鎖定成功，直接叫出 LINE 內建的多人分享視窗
+        if (liff.isApiAvailable('shareTargetPicker')) {
+          const sendResult = await liff.shareTargetPicker([
+            {
+              "type": "flex",
+              "altText": "🛠️ 收到全新派工任務通知！",
+              "contents": {
+                "type": "bubble",
+                "styles": { "header": { "backgroundColor": "#1b5e20" } }, // 指派給基層同仁的綠色卡片
+                "header": {
+                  "type": "box", "layout": "vertical",
+                  "contents": [{ "type": "text", "text": "🛠️ 任務指派通知", "textColor": "#FFFFFF", "weight": "bold", "size": "lg" }]
+                },
+                "body": {
+                  "type": "box", "layout": "vertical", "spacing": "md",
+                  "contents": [
+                    { "type": "text", "text": "請指定負責人前往現場處理，並在處理完成後點擊下方按鈕進行完工回報：", "size": "sm", "color": "#555555", "wrap": true },
+                    { "type": "separator" },
+                    { "type": "text", "text": `案件編號: ${currentCase.caseId}`, "weight": "bold", "size": "md" },
+                    {
+                      "type": "box", "layout": "grid", "columns": "2",
+                      "contents": [
+                        { "type": "text", "text": "位置：", "color": "#888888", "size": "sm" },
+                        { "type": "text", "text": currentCase.location, "size": "sm", "wrap": true },
+                        { "type": "text", "text": "分類：", "color": "#888888", "size": "sm" },
+                        { "type": "text", "text": currentCase.category, "size": "sm" },
+                        { "type": "text", "text": "描述：", "color": "#888888", "size": "sm" },
+                        { "type": "text", "text": currentCase.desc, "size": "sm", "wrap": true }
+                      ]
+                    }
+                  ]
+                },
+                "footer": {
+                  "type": "box", "layout": "vertical",
+                  "contents": [{
+                    "type": "button", "style": "primary", "color": "#2e7d32",
+                    "action": { "type": "message", "label": "🏁 前往完工回報流程", "text": `完工回報 ${currentCase.caseId}` }
+                  }]
+                }
+              }
+            }
+          ]);
+
+          if (sendResult) {
+            alert("🎉 任務卡片已成功完成直接分享！");
+            liff.closeWindow(); 
+          } else {
+            alert("您取消了發送，但系統後台已登錄您為此單指派主管。");
+            liff.closeWindow();
+          }
+        } else {
+          alert("當前 LINE 版本不支援直接分享功能。");
+        }
+      } catch (error) {
+        alert("派工過程發生錯誤: " + error);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "🚀 確定指派 (直接分享至 LINE 聯絡人)";
+      }
+    }
+
+    window.onload = initLiff;
+  </script>
+</body>
+</html>
