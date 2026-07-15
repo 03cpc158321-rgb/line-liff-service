@@ -270,7 +270,7 @@
       }
     }
 
-    // 主管：指派維修人並喚起好友分享 (升級安全防禦版)
+    // 主管：指派維修人並喚起好友分享 (100% 強固版，避免 LINE 伺服器拒收)
     function handleAssign() {
       const assigneeName = document.getElementById('assignee-name').value.trim();
       if (!assigneeName) {
@@ -296,7 +296,7 @@
               
               const sharedLiffUrl = "https://liff.line.me/" + LIFF_ID + "?caseNo=" + encodeURIComponent(globalCaseNo || "");
 
-              // 🛡️ 解決問題 2：加入防禦性安全降級，將 layout 改為 horizontal，並確保絕無 undefined 進入 JSON
+              // 🛡️ 採用極簡縱向卡片格式，保證通過 LINE 伺服器的 Schema 驗證
               liff.shareTargetPicker([
                 {
                   "type": "flex",
@@ -304,52 +304,56 @@
                   "contents": {
                     "type": "bubble",
                     "body": {
-                      "type": "box", "layout": "vertical",
+                      "type": "box",
+                      "layout": "vertical",
                       "contents": [
-                        { "type": "text", "text": "🛠️ 收到維修指派通知", "weight": "bold", "size": "xl", "color": "#1A73E8" },
-                        { "type": "separator", "margin": "md" },
                         {
-                          "type": "box", "layout": "vertical", "margin": "lg", "spacing": "sm",
-                          "contents": [
-                            { 
-                              "type": "box", "layout": "horizontal", "spacing": "sm", 
-                              "contents": [
-                                { "type": "text", "text": "案件編號", "color": "#aaaaaa", "size": "sm", "flex": 2 }, 
-                                { "type": "text", "text": globalCaseNo || "未知", "wrap": true, "color": "#666666", "size": "sm", "flex": 5 }
-                              ] 
-                            },
-                            { 
-                              "type": "box", "layout": "horizontal", "spacing": "sm", 
-                              "contents": [
-                                { "type": "text", "text": "問題分類", "color": "#aaaaaa", "size": "sm", "flex": 2 }, 
-                                { "type": "text", "text": globalCategory || "未分類", "wrap": true, "color": "#666666", "size": "sm", "flex": 5 }
-                              ] 
-                            },
-                            { 
-                              "type": "box", "layout": "horizontal", "spacing": "sm", 
-                              "contents": [
-                                { "type": "text", "text": "故障位置", "color": "#aaaaaa", "size": "sm", "flex": 2 }, 
-                                { "type": "text", "text": globalLocation || "未記錄", "wrap": true, "color": "#2B6CB0", "weight": "bold", "size": "sm", "flex": 5 }
-                              ] 
-                            },
-                            { 
-                              "type": "box", "layout": "vertical", "margin": "md", 
-                              "contents": [
-                                { "type": "text", "text": "負責人員", "color": "#aaaaaa", "size": "sm" }, 
-                                { "type": "text", "text": assigneeName || "未指派", "wrap": true, "color": "#333333", "size": "sm", "margin": "xs" }
-                              ] 
-                            }
-                          ]
+                          "type": "text",
+                          "text": "🛠️ 收到維修指派通知",
+                          "weight": "bold",
+                          "size": "xl",
+                          "color": "#1A73E8"
+                        },
+                        {
+                          "type": "text",
+                          "text": "案件編號: " + (globalCaseNo || "未知"),
+                          "margin": "md",
+                          "size": "sm"
+                        },
+                        {
+                          "type": "text",
+                          "text": "問題分類: " + (globalCategory || "未分類"),
+                          "margin": "sm",
+                          "size": "sm"
+                        },
+                        {
+                          "type": "text",
+                          "text": "故障位置: " + (globalLocation || "未記錄"),
+                          "margin": "sm",
+                          "size": "sm",
+                          "color": "#2B6CB0",
+                          "weight": "bold"
+                        },
+                        {
+                          "type": "text",
+                          "text": "負責人員: " + (assigneeName || "未指派"),
+                          "margin": "sm",
+                          "size": "sm"
                         }
                       ]
                     },
                     "footer": {
-                      "type": "box", "layout": "vertical",
+                      "type": "box",
+                      "layout": "vertical",
+                      "spacing": "sm",
                       "contents": [
                         {
-                          "type": "button", "style": "primary", "color": "#1A73E8",
+                          "type": "button",
+                          "style": "primary",
+                          "color": "#1A73E8",
                           "action": {
-                            "type": "uri", "label": "👉 前往處理與完工回報",
+                            "type": "uri",
+                            "label": "👉 前往完工回報",
                             "uri": sharedLiffUrl
                           }
                         }
@@ -359,11 +363,11 @@
                 },
                 {
                   "type": "text",
-                  "text": "🔗 同仁專屬完工回報網址：\n" + sharedLiffUrl
+                  "text": "🔗 您的完工回報專屬網址：\n" + sharedLiffUrl
                 }
               ]).then(function(resShare) {
                 if (resShare) {
-                  alert('指派成功，並已成功分享卡片至維修同仁！');
+                  alert('指派成功，並已成功分享卡片與連結至維修同仁！');
                 } else {
                   alert('系統已登記指派為：' + assigneeName + '，但您未送出分享。');
                 }
@@ -388,7 +392,7 @@
           btn.innerText = '確認指派並分享給維修同仁';
         });
     }
-
+    
     // 維修同仁：完工回報
     function handleComplete() {
       const repairDesc = document.getElementById('repair-desc').value.trim();
