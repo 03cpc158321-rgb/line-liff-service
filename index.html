@@ -2,6 +2,8 @@
 <html>
 <head>
   <meta charset="UTF-8">
+  <!-- 🛡️ 解決問題 1：手動加上 viewport 標籤，讓網頁在手機上 1:1 滿版顯示 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>廠務智慧維修與指派系統</title>
   <!-- 導入 Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -132,22 +134,21 @@
   </div>
 
   <script>
-    // 🛡️ 獨立網頁版：直接寫死您的實體 LINE LIFF ID 與 GAS API 網址
+    // 🛡️ 實體 LINE LIFF ID 與 GAS API 網址 (請確認以下兩個參數皆正確填寫)
     const LIFF_ID = "2010669971-OLqT3vTq"; 
     const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwzWJT0vyvXd6Qn-4Iqoje7n04HsDEMcDt6D9LGcDuY3yIBUVg3b1Xy4SXBh1HpWEWHhg/exec"; 
     
-    // 接下來的程式碼與先前完全一模一樣...
     let globalCaseNo = ""; 
     let globalCategory = "";
     let globalLocation = "";
 
-    // 全域錯誤監聽：若網頁執行有任何 JS 錯誤，直接呈現在對照面板上
+    // 全域錯誤監聽
     window.onerror = function(message, source, lineno, colno, error) {
       showError('JavaScript 執行錯誤: ' + message + ' (第 ' + lineno + ' 行)');
       return false;
     };
 
-    // 備用瀏覽器端擷取函數
+    // 瀏覽器端擷取參數
     function getCaseNoFromUrl() {
       const urlParams = new URLSearchParams(window.location.search);
       let caseNo = urlParams.get('caseNo');
@@ -170,9 +171,8 @@
 
     // 初始化 LIFF
     window.onload = function() {
-      // 確保 LIFF SDK 確實有正常載入 (防止 Google 容器偶發阻擋)
       if (typeof liff === 'undefined') {
-        showError('⚠️ LINE LIFF SDK 載入失敗。\n這通常是因為瀏覽器安全性設定（CSP）阻擋了外部腳本，或者是網路限制。');
+        showError('⚠️ LINE LIFF SDK 載入失敗。\n這通常是因為網路防火牆限制。');
         return;
       }
 
@@ -191,9 +191,7 @@
           if (!liff.isLoggedIn()) {
             liff.login();
           } else {
-            if (!globalCaseNo) {
-              globalCaseNo = getCaseNoFromUrl();
-            }
+            globalCaseNo = getCaseNoFromUrl();
 
             if (!globalCaseNo) {
               clearTimeout(timeoutTimer);
@@ -201,7 +199,7 @@
               return;
             }
             
-            // 🚀 【升級】：捨棄 google.script.run，改用標準 fetch API (GET) 呼叫後端
+            // 呼叫後端 API
             const reqUrl = `${WEB_APP_URL}?action=getCaseDetails&caseNo=${encodeURIComponent(globalCaseNo)}`;
             
             fetch(reqUrl)
@@ -272,7 +270,7 @@
       }
     }
 
-    // 主管：指派維修人並喚起好友分享
+    // 主管：指派維修人並喚起好友分享 (升級安全防禦版)
     function handleAssign() {
       const assigneeName = document.getElementById('assignee-name').value.trim();
       if (!assigneeName) {
@@ -284,7 +282,7 @@
       btn.disabled = true;
       btn.innerText = '正在指派中...';
 
-      // 🚀 【升級】：改用標準 fetch API (GET) 提交指派
+      // 呼叫 API 提交指派
       const reqUrl = `${WEB_APP_URL}?action=assignCase&caseNo=${encodeURIComponent(globalCaseNo)}&assigneeName=${encodeURIComponent(assigneeName)}`;
 
       fetch(reqUrl)
@@ -296,8 +294,9 @@
           if (res.success) {
             if (liff.isApiAvailable('shareTargetPicker')) {
               
-              const sharedLiffUrl = "https://liff.line.me/" + LIFF_ID + "?caseNo=" + encodeURIComponent(globalCaseNo);
+              const sharedLiffUrl = "https://liff.line.me/" + LIFF_ID + "?caseNo=" + encodeURIComponent(globalCaseNo || "");
 
+              // 🛡️ 解決問題 2：加入防禦性安全降級，將 layout 改為 horizontal，並確保絕無 undefined 進入 JSON
               liff.shareTargetPicker([
                 {
                   "type": "flex",
@@ -312,10 +311,34 @@
                         {
                           "type": "box", "layout": "vertical", "margin": "lg", "spacing": "sm",
                           "contents": [
-                            { "type": "box", "layout": "baseline", "spacing": "sm", "contents": [{ "type": "text", "text": "案件編號", "color": "#aaaaaa", "size": "sm", "flex": 2 }, { "type": "text", "text": globalCaseNo, "wrap": true, "color": "#666666", "size": "sm", "flex": 5 }] },
-                            { "type": "box", "layout": "baseline", "spacing": "sm", "contents": [{ "type": "text", "text": "問題分類", "color": "#aaaaaa", "size": "sm", "flex": 2 }, { "type": "text", "text": globalCategory, "wrap": true, "color": "#666666", "size": "sm", "flex": 5 }] },
-                            { "type": "box", "layout": "baseline", "spacing": "sm", "contents": [{ "type": "text", "text": "故障位置", "color": "#aaaaaa", "size": "sm", "flex": 2 }, { "type": "text", "text": globalLocation, "wrap": true, "color": "#2B6CB0", "weight": "bold", "size": "sm", "flex": 5 }] },
-                            { "type": "box", "layout": "vertical", "margin": "md", "contents": [{ "type": "text", "text": "負責人員", "color": "#aaaaaa", "size": "sm" }, { "type": "text", "text": assigneeName, "wrap": true, "color": "#333333", "size": "sm", "margin": "xs" }] }
+                            { 
+                              "type": "box", "layout": "horizontal", "spacing": "sm", 
+                              "contents": [
+                                { "type": "text", "text": "案件編號", "color": "#aaaaaa", "size": "sm", "flex": 2 }, 
+                                { "type": "text", "text": globalCaseNo || "未知", "wrap": true, "color": "#666666", "size": "sm", "flex": 5 }
+                              ] 
+                            },
+                            { 
+                              "type": "box", "layout": "horizontal", "spacing": "sm", 
+                              "contents": [
+                                { "type": "text", "text": "問題分類", "color": "#aaaaaa", "size": "sm", "flex": 2 }, 
+                                { "type": "text", "text": globalCategory || "未分類", "wrap": true, "color": "#666666", "size": "sm", "flex": 5 }
+                              ] 
+                            },
+                            { 
+                              "type": "box", "layout": "horizontal", "spacing": "sm", 
+                              "contents": [
+                                { "type": "text", "text": "故障位置", "color": "#aaaaaa", "size": "sm", "flex": 2 }, 
+                                { "type": "text", "text": globalLocation || "未記錄", "wrap": true, "color": "#2B6CB0", "weight": "bold", "size": "sm", "flex": 5 }
+                              ] 
+                            },
+                            { 
+                              "type": "box", "layout": "vertical", "margin": "md", 
+                              "contents": [
+                                { "type": "text", "text": "負責人員", "color": "#aaaaaa", "size": "sm" }, 
+                                { "type": "text", "text": assigneeName || "未指派", "wrap": true, "color": "#333333", "size": "sm", "margin": "xs" }
+                              ] 
+                            }
                           ]
                         }
                       ]
@@ -342,11 +365,11 @@
                 if (resShare) {
                   alert('指派成功，並已成功分享卡片至維修同仁！');
                 } else {
-                  alert('系統已登記指派為：' + assigneeName + '，但您剛才取消了分享傳送。');
+                  alert('系統已登記指派為：' + assigneeName + '，但您未送出分享。');
                 }
                 liff.closeWindow();
               }).catch(function(errShare) {
-                alert('系統指派成功！但分享傳送失敗：' + errShare.message + '\n請確認您已在 LINE Console 啟用 Share Target Picker 功能。');
+                alert('系統指派成功！但分享傳送失敗，請確認：\n1. LINE Developers 後台已開啟「Share Target Picker」功能。\n2. 登入授權時有勾選「傳送訊息至聊天室」權限。\n\n詳細錯誤：' + errShare.message);
                 liff.closeWindow();
               });
             } else {
@@ -390,7 +413,6 @@
       compressImage(file, function(base64Image) {
         document.getElementById('compressing-msg').classList.add('hidden');
         
-        // 🚀 【升級】：大檔案改用標準 fetch API (POST) 送至後端 doPost 進行解析儲存
         const payload = {
           action: 'completeCase',
           caseNo: globalCaseNo,
@@ -475,7 +497,7 @@
       debugDiv.innerHTML = `
         <div class="text-amber-400 font-bold border-b border-gray-700 pb-1 mb-1 flex justify-between">
           <span>🔍 系統排查對照面板 (Debug Console)</span>
-          <span class="text-gray-500">v3.0 - API 版</span>
+          <span class="text-gray-500">v3.1 - API+Pages 強固版</span>
         </div>
         <div><strong>[1] 預期產生之 LIFF 網址:</strong><br><span class="text-blue-300">https://liff.line.me/${LIFF_ID}?caseNo=...</span></div>
         <div class="mt-2"><strong>[2] 瀏覽器實體網址 (window.location.href):</strong><br><span class="text-green-400 break-all">${window.location.href}</span></div>
