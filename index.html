@@ -93,9 +93,8 @@
           <textarea id="repair-desc" rows="3" placeholder="請填寫具體修復成果（如：已更換保險絲，重新測試正常）" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"></textarea>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">拍攝/上傳完工照片 (必填)：</label>
+          <label class="block text-sm font-medium text-gray-700 mb-1">拍攝/上傳完工照片 (選填)：</label>
           <input type="file" id="complete-file" accept="image/*" capture="environment" class="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
-          <!-- 🛠️ 診斷訊息更新區 -->
           <div id="compressing-msg" class="hidden text-xs text-amber-600 mt-2 font-mono bg-amber-50 p-2 rounded border border-amber-200 animate-pulse">⚙️ 正在進行高解析度照片壓縮優化...</div>
         </div>
         <button id="btn-complete" onclick="handleComplete()" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 px-4 rounded-lg shadow-sm transition duration-200 text-sm flex justify-center items-center">
@@ -141,6 +140,7 @@
     let globalCaseNo = ""; 
     let globalCategory = "";
     let globalLocation = "";
+    let globalDescription = ""; // 🚀 【調整五】：宣告全域原始問題描述變數
 
     // 全域錯誤監聽
     window.onerror = function(message, source, lineno, colno, error) {
@@ -176,7 +176,6 @@
         return;
       }
 
-      // 設定 6 秒逾時診斷器
       const timeoutTimer = setTimeout(function() {
         const loadingDiv = document.getElementById('loading');
         if (!loadingDiv.classList.contains('hidden')) {
@@ -235,6 +234,7 @@
       
       globalCategory = c.category;
       globalLocation = c.location;
+      globalDescription = c.description; // 🚀 【調整五】：保存原始報修描述
 
       document.getElementById('case-no').innerText = c.caseNo;
       document.getElementById('case-time').innerText = c.time;
@@ -270,7 +270,7 @@
       }
     }
 
-    // 主管：指派維修人並喚起好友分享
+    // 主管：指派維修人並喚起好友分享 (純卡片版)
     function handleAssign() {
       const assigneeName = document.getElementById('assignee-name').value.trim();
       if (!assigneeName) {
@@ -296,6 +296,7 @@
               
               const sharedLiffUrl = "https://liff.line.me/" + LIFF_ID + "?caseNo=" + encodeURIComponent(globalCaseNo || "");
 
+              // 🚀 【調整四、五】：移除純文字網址，卡片內補上「問題描述 (globalDescription)」
               liff.shareTargetPicker([
                 {
                   "type": "flex",
@@ -314,30 +315,52 @@
                           "color": "#1A73E8"
                         },
                         {
-                          "type": "text",
-                          "text": "案件編號: " + (globalCaseNo || "未知"),
-                          "margin": "md",
-                          "size": "sm"
+                          "type": "separator",
+                          "margin": "md"
                         },
                         {
-                          "type": "text",
-                          "text": "問題分類: " + (globalCategory || "未分類"),
-                          "margin": "sm",
-                          "size": "sm"
-                        },
-                        {
-                          "type": "text",
-                          "text": "故障位置: " + (globalLocation || "未記錄"),
-                          "margin": "sm",
-                          "size": "sm",
-                          "color": "#2B6CB0",
-                          "weight": "bold"
-                        },
-                        {
-                          "type": "text",
-                          "text": "負責人員: " + (assigneeName || "未指派"),
-                          "margin": "sm",
-                          "size": "sm"
+                          "type": "box",
+                          "layout": "vertical",
+                          "margin": "lg",
+                          "spacing": "sm",
+                          "contents": [
+                            { 
+                              "type": "box", "layout": "horizontal", "spacing": "sm", 
+                              "contents": [
+                                { "type": "text", "text": "案件編號", "color": "#aaaaaa", "size": "sm", "flex": 2 }, 
+                                { "type": "text", "text": globalCaseNo || "未知", "wrap": true, "color": "#666666", "size": "sm", "flex": 5 }
+                              ] 
+                            },
+                            { 
+                              "type": "box", "layout": "horizontal", "spacing": "sm", 
+                              "contents": [
+                                { "type": "text", "text": "問題分類", "color": "#aaaaaa", "size": "sm", "flex": 2 }, 
+                                { "type": "text", "text": globalCategory || "未分類", "wrap": true, "color": "#666666", "size": "sm", "flex": 5 }
+                              ] 
+                            },
+                            { 
+                              "type": "box", "layout": "horizontal", "spacing": "sm", 
+                              "contents": [
+                                { "type": "text", "text": "故障位置", "color": "#aaaaaa", "size": "sm", "flex": 2 }, 
+                                { "type": "text", "text": globalLocation || "未記錄", "wrap": true, "color": "#2B6CB0", "weight": "bold", "size": "sm", "flex": 5 }
+                              ] 
+                            },
+                            // 🚀 【調整五】：指派任務卡片中新增顯示原始「問題描述」
+                            { 
+                              "type": "box", "layout": "vertical", "margin": "md", 
+                              "contents": [
+                                { "type": "text", "text": "問題描述：", "color": "#aaaaaa", "size": "sm" }, 
+                                { "type": "text", "text": globalDescription || "無描述", "wrap": true, "color": "#333333", "size": "sm", "margin": "xs" }
+                              ] 
+                            },
+                            { 
+                              "type": "box", "layout": "vertical", "margin": "md", 
+                              "contents": [
+                                { "type": "text", "text": "負責同仁：", "color": "#aaaaaa", "size": "sm" }, 
+                                { "type": "text", "text": assigneeName || "未指派", "wrap": true, "color": "#333333", "size": "sm", "margin": "xs" }
+                              ] 
+                            }
+                          ]
                         }
                       ]
                     },
@@ -359,20 +382,16 @@
                       ]
                     }
                   }
-                },
-                {
-                  "type": "text",
-                  "text": "🔗 您的完工回報專屬網址：\n" + sharedLiffUrl
                 }
               ]).then(function(resShare) {
                 if (resShare) {
-                  alert('指派成功，並已成功分享卡片與連結至維修同仁！');
+                  alert('指派成功，已傳送維修任務卡片！');
                 } else {
                   alert('系統已登記指派為：' + assigneeName + '，但您未送出分享。');
                 }
                 liff.closeWindow();
               }).catch(function(errShare) {
-                alert('系統指派成功！但分享傳送失敗，請確認：\n1. LINE Developers 後台已開啟「Share Target Picker」功能。\n2. 登入授權時有勾選「傳送訊息至聊天室」權限。\n\n詳細錯誤：' + errShare.message);
+                alert('系統指派成功！但分享傳送失敗。詳細錯誤：' + errShare.message);
                 liff.closeWindow();
               });
             } else {
@@ -392,17 +411,13 @@
         });
     }
 
-    // 維修同仁：完工回報 (防禦優化與全步驟診斷版)
+    // 維修同仁：完工回報 (防禦優化與選填照片版)
     function handleComplete() {
       const repairDesc = document.getElementById('repair-desc').value.trim();
       const fileInput = document.getElementById('complete-file');
       
       if (!repairDesc) {
         alert('請填寫維修成果描述！');
-        return;
-      }
-      if (fileInput.files.length === 0) {
-        alert('請拍攝並上傳一張完工後的現場對照照片！');
         return;
       }
 
@@ -412,51 +427,57 @@
 
       const file = fileInput.files[0];
       
-      // 🚀 執行升級版步驟診斷壓縮
-      compressImage(file, function(base64Image) {
-        updateLoadingProgress('照片壓縮完成！正在準備連線並上傳資料...');
-        
-        const payload = {
-          action: 'completeCase',
-          caseNo: globalCaseNo,
-          repairDesc: repairDesc,
-          photoBase64: base64Image
-        };
+      // 🚀 【調整二】：選填完工照。若有選取檔案則執行壓縮，否則直接空字串結案上傳
+      if (file) {
+        compressImage(file, function(base64Image) {
+          sendCompletionToServer(repairDesc, base64Image, btn);
+        });
+      } else {
+        updateLoadingProgress('未選取照片，直接進行免照片結案...');
+        sendCompletionToServer(repairDesc, '', btn);
+      }
+    }
 
-        updateLoadingProgress('正在傳送資料與完工相片至伺服器 (請保持網路連線)...');
+    // 遞送結案至伺服器
+    function sendCompletionToServer(repairDesc, base64Image, btn) {
+      const payload = {
+        action: 'completeCase',
+        caseNo: globalCaseNo,
+        repairDesc: repairDesc,
+        photoBase64: base64Image || ''
+      };
 
-        // 呼叫 API POST 提交結案
-        fetch(WEB_APP_URL, {
-          method: 'POST',
-          body: JSON.stringify(payload)
-        })
-        .then(response => {
-          updateLoadingProgress('伺服器已回應，正在解析結果...');
-          if (!response.ok) throw new Error('伺服器網路錯誤 HTTP ' + response.status);
-          return response.json();
-        })
-        .then(res => {
-          // 隱藏進度字樣
-          document.getElementById('compressing-msg').classList.add('hidden');
-          if (res.success) {
-            alert('完工結案申報成功！感謝您的付出。');
-            liff.closeWindow();
-          } else {
-            alert('結案失敗（伺服器拒絕）：' + res.message);
-            btn.disabled = false;
-            btn.innerText = '提交完工結案';
-          }
-        })
-        .catch(err => {
-          document.getElementById('compressing-msg').classList.add('hidden');
-          alert('傳送失敗（連線錯誤）：' + err.toString() + '\n\n請確認您的手機目前網路通暢，並再試一次。');
+      updateLoadingProgress('正在傳送結案資料至伺服器 (請保持網路連線)...');
+
+      fetch(WEB_APP_URL, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      })
+      .then(response => {
+        updateLoadingProgress('伺服器已回應，正在解析結果...');
+        if (!response.ok) throw new Error('伺服器網路錯誤 HTTP ' + response.status);
+        return response.json();
+      })
+      .then(res => {
+        document.getElementById('compressing-msg').classList.add('hidden');
+        if (res.success) {
+          alert('完工結案申報成功！感謝您的付出。');
+          liff.closeWindow();
+        } else {
+          alert('結案失敗（伺服器拒絕）：' + res.message);
           btn.disabled = false;
           btn.innerText = '提交完工結案';
-        });
+        }
+      })
+      .catch(err => {
+        document.getElementById('compressing-msg').classList.add('hidden');
+        alert('傳送失敗（連線錯誤）：' + err.toString());
+        btn.disabled = false;
+        btn.innerText = '提交完工結案';
       });
     }
 
-    // 🛡️ 實時進度提示器
+    // 實時進度提示器
     function updateLoadingProgress(msg) {
       const msgDiv = document.getElementById('compressing-msg');
       if (msgDiv) {
@@ -465,7 +486,7 @@
       }
     }
 
-    // 🛡️ HTML5 Canvas 前端壓縮圖片 (新增完整錯誤捕獲與進度回報)
+    // HTML5 Canvas 前端壓縮圖片 (選填調用)
     function compressImage(file, callback) {
       const reader = new FileReader();
       
@@ -488,7 +509,6 @@
             let width = img.width;
             let height = img.height;
             
-            // 🛡️ 最佳化防禦：將最大尺寸限制在 900px，能進一步降低手機與伺服器的記憶體開銷，傳輸速度可提升 50%
             const max_size = 900; 
             if (width > height) {
               if (width > max_size) {
@@ -508,9 +528,8 @@
             ctx.drawImage(img, 0, 0, width, height);
             
             updateLoadingProgress('正在壓縮畫質並打包成傳輸封包...');
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.6); // 畫質設定 0.6 是效能與清晰度最完美的中間值
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.6); 
             
-            // 計算大約體積
             const approxSize = Math.round((dataUrl.length * 3) / 4 / 1024);
             updateLoadingProgress('影像優化完成！體積：' + approxSize + ' KB (已成功縮小 95% 以上)。');
             
@@ -541,7 +560,7 @@
       debugDiv.innerHTML = `
         <div class="text-amber-400 font-bold border-b border-gray-700 pb-1 mb-1 flex justify-between">
           <span>🔍 系統排查對照面板 (Debug Console)</span>
-          <span class="text-gray-500">v3.1 - API+Pages 強固版</span>
+          <span class="text-gray-500">v3.2 - 終強優化版</span>
         </div>
         <div><strong>[1] 預期產生之 LIFF 網址:</strong><br><span class="text-blue-300">https://liff.line.me/${LIFF_ID}?caseNo=...</span></div>
         <div class="mt-2"><strong>[2] 瀏覽器實體網址 (window.location.href):</strong><br><span class="text-green-400 break-all">${window.location.href}</span></div>
