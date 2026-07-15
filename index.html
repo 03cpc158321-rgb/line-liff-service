@@ -140,7 +140,7 @@
     let globalCaseNo = ""; 
     let globalCategory = "";
     let globalLocation = "";
-    let globalDescription = ""; // 🚀 【調整五】：宣告全域原始問題描述變數
+    let globalDescription = ""; // 原始問題描述
 
     // 全域錯誤監聽
     window.onerror = function(message, source, lineno, colno, error) {
@@ -234,7 +234,7 @@
       
       globalCategory = c.category;
       globalLocation = c.location;
-      globalDescription = c.description; // 🚀 【調整五】：保存原始報修描述
+      globalDescription = c.description; // 原始報修描述
 
       document.getElementById('case-no').innerText = c.caseNo;
       document.getElementById('case-time').innerText = c.time;
@@ -270,7 +270,7 @@
       }
     }
 
-    // 主管：指派維修人並喚起好友分享 (純卡片版)
+    // 主管：指派維修人並喚起好友分享 (扁平強固版)
     function handleAssign() {
       const assigneeName = document.getElementById('assignee-name').value.trim();
       if (!assigneeName) {
@@ -296,7 +296,10 @@
               
               const sharedLiffUrl = "https://liff.line.me/" + LIFF_ID + "?caseNo=" + encodeURIComponent(globalCaseNo || "");
 
-              // 🚀 【調整四、五】：移除純文字網址，卡片內補上「問題描述 (globalDescription)」
+              // 🚀 【強固核心修正】：
+              // 1. 將第二條純文字網址徹底移除，使畫面最乾淨。
+              // 2. 使用 100% 被 LINE 伺服器接受的單層扁平縱向佈局（無 nested box）。
+              // 3. 補上「問題描述」欄位。
               liff.shareTargetPicker([
                 {
                   "type": "flex",
@@ -315,52 +318,38 @@
                           "color": "#1A73E8"
                         },
                         {
-                          "type": "separator",
-                          "margin": "md"
+                          "type": "text",
+                          "text": "案件編號: " + String(globalCaseNo || "未知"),
+                          "margin": "md",
+                          "size": "sm"
                         },
                         {
-                          "type": "box",
-                          "layout": "vertical",
-                          "margin": "lg",
-                          "spacing": "sm",
-                          "contents": [
-                            { 
-                              "type": "box", "layout": "horizontal", "spacing": "sm", 
-                              "contents": [
-                                { "type": "text", "text": "案件編號", "color": "#aaaaaa", "size": "sm", "flex": 2 }, 
-                                { "type": "text", "text": globalCaseNo || "未知", "wrap": true, "color": "#666666", "size": "sm", "flex": 5 }
-                              ] 
-                            },
-                            { 
-                              "type": "box", "layout": "horizontal", "spacing": "sm", 
-                              "contents": [
-                                { "type": "text", "text": "問題分類", "color": "#aaaaaa", "size": "sm", "flex": 2 }, 
-                                { "type": "text", "text": globalCategory || "未分類", "wrap": true, "color": "#666666", "size": "sm", "flex": 5 }
-                              ] 
-                            },
-                            { 
-                              "type": "box", "layout": "horizontal", "spacing": "sm", 
-                              "contents": [
-                                { "type": "text", "text": "故障位置", "color": "#aaaaaa", "size": "sm", "flex": 2 }, 
-                                { "type": "text", "text": globalLocation || "未記錄", "wrap": true, "color": "#2B6CB0", "weight": "bold", "size": "sm", "flex": 5 }
-                              ] 
-                            },
-                            // 🚀 【調整五】：指派任務卡片中新增顯示原始「問題描述」
-                            { 
-                              "type": "box", "layout": "vertical", "margin": "md", 
-                              "contents": [
-                                { "type": "text", "text": "問題描述：", "color": "#aaaaaa", "size": "sm" }, 
-                                { "type": "text", "text": globalDescription || "無描述", "wrap": true, "color": "#333333", "size": "sm", "margin": "xs" }
-                              ] 
-                            },
-                            { 
-                              "type": "box", "layout": "vertical", "margin": "md", 
-                              "contents": [
-                                { "type": "text", "text": "負責同仁：", "color": "#aaaaaa", "size": "sm" }, 
-                                { "type": "text", "text": assigneeName || "未指派", "wrap": true, "color": "#333333", "size": "sm", "margin": "xs" }
-                              ] 
-                            }
-                          ]
+                          "type": "text",
+                          "text": "問題分類: " + String(globalCategory || "未分類"),
+                          "margin": "sm",
+                          "size": "sm"
+                        },
+                        {
+                          "type": "text",
+                          "text": "故障位置: " + String(globalLocation || "未記錄"),
+                          "margin": "sm",
+                          "size": "sm",
+                          "color": "#2B6CB0",
+                          "weight": "bold"
+                        },
+                        // 🚀 【調整五】：在扁平縱向清單中，安全呈現「問題描述」
+                        {
+                          "type": "text",
+                          "text": "問題描述: " + String(globalDescription || "無描述"),
+                          "margin": "sm",
+                          "size": "sm",
+                          "wrap": true
+                        },
+                        {
+                          "type": "text",
+                          "text": "負責同仁: " + String(assigneeName || "未指派"),
+                          "margin": "sm",
+                          "size": "sm"
                         }
                       ]
                     },
@@ -385,7 +374,7 @@
                 }
               ]).then(function(resShare) {
                 if (resShare) {
-                  alert('指派成功，已傳送維修任務卡片！');
+                  alert('指派成功，已成功發送維修卡片！');
                 } else {
                   alert('系統已登記指派為：' + assigneeName + '，但您未送出分享。');
                 }
@@ -486,7 +475,7 @@
       }
     }
 
-    // HTML5 Canvas 前端壓縮圖片 (選填調用)
+    // HTML5 Canvas 前端壓縮圖片
     function compressImage(file, callback) {
       const reader = new FileReader();
       
@@ -560,7 +549,7 @@
       debugDiv.innerHTML = `
         <div class="text-amber-400 font-bold border-b border-gray-700 pb-1 mb-1 flex justify-between">
           <span>🔍 系統排查對照面板 (Debug Console)</span>
-          <span class="text-gray-500">v3.2 - 終強優化版</span>
+          <span class="text-gray-500">v3.2 - 終強扁平版</span>
         </div>
         <div><strong>[1] 預期產生之 LIFF 網址:</strong><br><span class="text-blue-300">https://liff.line.me/${LIFF_ID}?caseNo=...</span></div>
         <div class="mt-2"><strong>[2] 瀏覽器實體網址 (window.location.href):</strong><br><span class="text-green-400 break-all">${window.location.href}</span></div>
