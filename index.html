@@ -1,189 +1,489 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html>
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>廠務維修系統 - 主管派工</title>
-  <!-- 導入穩定版 Tailwind CSS 進行現代化美觀排版 -->
+  <title>廠務智慧維修與指派系統</title>
+  <!-- 導入 Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- 導入 LINE 官方 LIFF SDK -->
-  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <!-- 導入 LINE LIFF SDK -->
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
-<body class="bg-slate-50 min-h-screen flex flex-col justify-between p-4 font-sans text-slate-800">
-
-  <!-- 案件主要卡片區塊 -->
-  <div class="bg-white p-6 rounded-2xl shadow-sm max-w-md w-full mx-auto mt-6 border border-slate-100">
-    <div class="border-b pb-4 mb-5 border-slate-100 flex justify-between items-start">
-      <div>
-        <span class="bg-amber-100 text-amber-800 text-xs font-bold px-2.5 py-1 rounded-md uppercase" id="caseStatus">讀取中...</span>
-        <h1 class="text-xl font-bold mt-2 text-slate-900" id="caseId">案件讀取中...</h1>
-      </div>
+<body class="bg-gray-100 min-h-screen text-gray-800">
+  
+  <div class="max-w-md mx-auto p-4">
+    <!-- 標題欄 -->
+    <div class="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-4 text-white shadow-md mb-4 text-center">
+      <h1 class="text-xl font-bold">🛠️ 廠務維修指派與完工系統</h1>
+      <p class="text-xs opacity-85 mt-1">智慧指派 ‧ 完工回報 ‧ 即時同步</p>
     </div>
 
-    <!-- 案件詳細圖文欄位 -->
-    <div class="space-y-4">
-      <div>
-        <label class="text-xs text-slate-400 block font-semibold tracking-wider mb-1">📍 設備位置</label>
-        <p class="text-base font-medium text-slate-700" id="caseLoc">-</p>
-      </div>
-      <div>
-        <label class="text-xs text-slate-400 block font-semibold tracking-wider mb-1">🏷️ 問題分類</label>
-        <p class="text-base font-medium text-slate-700" id="caseCat">-</p>
-      </div>
-      <div>
-        <label class="text-xs text-slate-400 block font-semibold tracking-wider mb-1">📝 問題詳細描述</label>
-        <p class="text-slate-600 text-sm whitespace-pre-line bg-slate-50 p-4 rounded-xl mt-1 border border-slate-100 leading-relaxed" id="caseDesc">-</p>
-      </div>
+    <!-- 載入中骨架 -->
+    <div id="loading" class="bg-white rounded-xl p-6 shadow-sm text-center">
+      <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto"></div>
+      <p class="text-sm text-gray-500 mt-3">正在查詢案件資料中，請稍候...</p>
     </div>
 
-    <!-- 免清單指派大按鈕 -->
-    <button id="assignBtn" disabled class="mt-8 w-full bg-slate-300 text-slate-500 font-bold py-3.5 px-4 rounded-xl shadow-sm cursor-not-allowed transition duration-200">
-      正在加載案件資料...
-    </button>
+    <!-- 異常提示 -->
+    <div id="error-box" class="hidden bg-red-50 border border-red-200 text-red-600 rounded-xl p-6 shadow-sm text-center">
+      <p id="error-message" class="font-medium"></p>
+    </div>
+
+    <!-- 案件詳細內容主容器 (預設隱藏) -->
+    <div id="case-content" class="hidden space-y-4">
+      
+      <!-- 案件詳情卡片 -->
+      <div class="bg-white rounded-xl p-5 shadow-sm space-y-3">
+        <div class="flex justify-between items-center border-b pb-2">
+          <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-800" id="badge-status">狀態</span>
+          <span class="text-xs text-gray-400" id="case-time">報修時間</span>
+        </div>
+        <div>
+          <label class="text-xs text-gray-400">案件編號</label>
+          <div class="font-mono text-sm font-bold text-gray-700" id="case-no"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="text-xs text-gray-400">問題分類</label>
+            <div class="text-sm font-semibold" id="case-category"></div>
+          </div>
+          <div>
+            <label class="text-xs text-gray-400">故障位置</label>
+            <div class="text-sm font-semibold text-blue-600" id="case-location"></div>
+          </div>
+        </div>
+        <div>
+          <label class="text-xs text-gray-400">損壞描述</label>
+          <div class="text-sm text-gray-600 bg-gray-50 p-2.5 rounded-lg border border-gray-100" id="case-desc"></div>
+        </div>
+        <div id="pre-photo-container" class="hidden">
+          <label class="text-xs text-gray-400">報修前佐證照片</label>
+          <a id="pre-photo-link" href="#" target="_blank" class="block mt-1">
+            <div class="bg-gray-100 text-blue-600 text-xs p-2 text-center rounded-lg border border-dashed border-blue-400 hover:bg-blue-50">
+              🖼️ 點此在新視窗查看報修照片
+            </div>
+          </a>
+        </div>
+      </div>
+
+      <!-- 區段一：主管指派面板 (若狀態為「待指派」) -->
+      <div id="section-assign" class="hidden bg-white rounded-xl p-5 shadow-sm space-y-4 border-t-4 border-blue-500">
+        <h2 class="font-bold text-lg text-gray-800 flex items-center">
+          <span class="bg-blue-500 text-white p-1 rounded-md text-xs mr-2">Step 1</span>
+          指派維修人員
+        </h2>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">請輸入維修人員姓名：</label>
+          <input type="text" id="assignee-name" placeholder="例如：王小明" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+        </div>
+        <button id="btn-assign" onclick="handleAssign()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-lg shadow-sm transition duration-200 text-sm flex justify-center items-center">
+          確認指派並分享給維修同仁
+        </button>
+      </div>
+
+      <!-- 區段二：完工結案面板 (若狀態為「已指派」) -->
+      <div id="section-complete" class="hidden bg-white rounded-xl p-5 shadow-sm space-y-4 border-t-4 border-green-500">
+        <h2 class="font-bold text-lg text-gray-800 flex items-center">
+          <span class="bg-green-500 text-white p-1 rounded-md text-xs mr-2">Step 2</span>
+          完工結案回報
+        </h2>
+        <div>
+          <p class="text-xs text-gray-500 mb-2">負責維修人員：<span id="label-assignee" class="font-bold text-gray-700 text-sm"></span></p>
+          <label class="block text-sm font-medium text-gray-700 mb-1">請輸入維修成果描述：</label>
+          <textarea id="repair-desc" rows="3" placeholder="請填寫具體修復成果（如：已更換保險絲，重新測試正常）" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"></textarea>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">拍攝/上傳完工照片 (必填)：</label>
+          <input type="file" id="complete-file" accept="image/*" capture="environment" class="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
+          <div id="compressing-msg" class="hidden text-xs text-amber-600 mt-1 animate-pulse">正在進行高解析度照片壓縮優化...</div>
+        </div>
+        <button id="btn-complete" onclick="handleComplete()" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 px-4 rounded-lg shadow-sm transition duration-200 text-sm flex justify-center items-center">
+          提交完工結案
+        </button>
+      </div>
+
+      <!-- 區段三：案件已封存資訊面板 (若狀態為「已結案」) -->
+      <div id="section-archive" class="hidden bg-white rounded-xl p-5 shadow-sm space-y-3 border-t-4 border-gray-400">
+        <h2 class="font-bold text-lg text-gray-500">🔒 案件已封存結案</h2>
+        <div class="grid grid-cols-2 gap-2 text-xs border-b pb-2">
+          <div>
+            <span class="text-gray-400">維修人員：</span>
+            <span id="archive-assignee" class="font-semibold text-gray-700"></span>
+          </div>
+          <div>
+            <span class="text-gray-400">結案時間：</span>
+            <span id="archive-time" class="font-semibold text-gray-700"></span>
+          </div>
+        </div>
+        <div>
+          <label class="text-xs text-gray-400">維修成果描述</label>
+          <div class="text-sm text-gray-600 bg-gray-50 p-2 rounded-lg border" id="archive-desc"></div>
+        </div>
+        <div id="archive-photo-container" class="hidden">
+          <label class="text-xs text-gray-400">完工對照照片</label>
+          <a id="archive-photo-link" href="#" target="_blank" class="block mt-1">
+            <div class="bg-gray-100 text-green-600 text-xs p-2 text-center rounded-lg border border-dashed border-green-400 hover:bg-green-50">
+              🖼️ 點此在新視窗查看完工照
+            </div>
+          </a>
+        </div>
+      </div>
+
+    </div>
   </div>
 
-  <!-- 頁尾宣告 -->
-  <p class="text-center text-xs text-slate-400 mt-6 mb-4 tracking-wide">廠務報修系統 • 安全行號鎖定保護中</p>
-
   <script>
-    // ⚠️ 關鍵設定 1：請置換成您 GAS 部署後產生的「網頁應用程式 URL」(必須以 /exec 結尾)
-    const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzDUVDIjJhsRb80RDarCrFjoAc6vTjHZzM8rUb4ubGJNcrrDYgsXFbu7sgpIxIJ9xFG/exec";
+    // 🛡️ 獨立網頁版：直接寫死您的實體 LINE LIFF ID 與 GAS API 網址
+    const LIFF_ID = "2010669971-OLqT3vTq"; 
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwzWJT0vyvXd6Qn-4Iqoje7n04HsDEMcDt6D9LGcDuY3yIBUVg3b1Xy4SXBh1HpWEWHhg/exec"; 
     
-    let currentCase = null;
-    let adminProfile = null;
+    // 接下來的程式碼與先前完全一模一樣...
+    let globalCaseNo = ""; 
+    let globalCategory = "";
+    let globalLocation = "";
 
-    async function initLiff() {
-      try {
-        // ⚠️ 關鍵設定 2：請輸入您在 LINE Developers 後台申請到的 LIFF ID
-        await liff.init({ liffId: "2010634850-wuUwaKpv" });
-        
-        if (!liff.isLoggedIn()) {
-          liff.login();
-          return;
+    // 全域錯誤監聽：若網頁執行有任何 JS 錯誤，直接呈現在對照面板上
+    window.onerror = function(message, source, lineno, colno, error) {
+      showError('JavaScript 執行錯誤: ' + message + ' (第 ' + lineno + ' 行)');
+      return false;
+    };
+
+    // 備用瀏覽器端擷取函數
+    function getCaseNoFromUrl() {
+      const urlParams = new URLSearchParams(window.location.search);
+      let caseNo = urlParams.get('caseNo');
+      if (caseNo) return caseNo;
+      
+      const liffState = urlParams.get('liff.state');
+      if (liffState) {
+        try {
+          const decodedState = decodeURIComponent(liffState);
+          const stateQuery = decodedState.includes('?') ? decodedState.split('?')[1] : decodedState;
+          const stateParams = new URLSearchParams(stateQuery);
+          caseNo = stateParams.get('caseNo');
+          if (caseNo) return caseNo;
+        } catch (e) {
+          console.error("解析 liff.state 失敗:", e);
         }
-        
-        // 抓取點擊此網頁的主管 LINE 個人資訊
-        adminProfile = await liff.getProfile();
-        
-        // 解析 LINE 傳過來的網址參數 (?caseId=xxxx)
-        const urlParams = new URLSearchParams(window.location.search);
-        const caseId = urlParams.get('caseId');
-        
-        if (!caseId) {
-          alert("錯誤：網頁連結未帶入案件編號！");
-          return;
+      }
+      return null;
+    }
+
+    // 初始化 LIFF
+    window.onload = function() {
+      // 確保 LIFF SDK 確實有正常載入 (防止 Google 容器偶發阻擋)
+      if (typeof liff === 'undefined') {
+        showError('⚠️ LINE LIFF SDK 載入失敗。\n這通常是因為瀏覽器安全性設定（CSP）阻擋了外部腳本，或者是網路限制。');
+        return;
+      }
+
+      // 設定 6 秒逾時診斷器
+      const timeoutTimer = setTimeout(function() {
+        const loadingDiv = document.getElementById('loading');
+        if (!loadingDiv.classList.contains('hidden')) {
+          showError(
+            '⚠️ 讀取連線逾時！\n這通常是因為試算表網址設定有誤，或是 GAS 後端執行時間過長。'
+          );
         }
+      }, 6000);
 
-        // 向後端 GAS 發出請求，抓取這筆案件的最新狀態
-        const response = await fetch(`${GAS_WEBAPP_URL}?action=getCase&caseId=${caseId}`);
-        currentCase = await response.json();
-
-        if (currentCase.success) {
-          document.getElementById('caseId').innerText = currentCase.caseId;
-          document.getElementById('caseLoc').innerText = currentCase.location;
-          document.getElementById('caseCat').innerText = currentCase.category;
-          document.getElementById('caseDesc').innerText = currentCase.desc;
-          document.getElementById('caseStatus').innerText = currentCase.status;
-
-          const btn = document.getElementById('assignBtn');
-          if (currentCase.status === '待指派') {
-            document.getElementById('caseStatus').className = "bg-amber-100 text-amber-800 text-xs font-bold px-2.5 py-1 rounded-md";
-            btn.innerText = "🚀 確定指派 (直接分享至 LINE 聯絡人)";
-            btn.className = "mt-8 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition duration-200 cursor-pointer text-center";
-            btn.disabled = false;
-            btn.onclick = startAssignment;
+      liff.init({ liffId: LIFF_ID })
+        .then(() => {
+          if (!liff.isLoggedIn()) {
+            liff.login();
           } else {
-            document.getElementById('caseStatus').className = "bg-slate-200 text-slate-600 text-xs font-bold px-2.5 py-1 rounded-md";
-            btn.innerText = `此案件已被處理 (${currentCase.status})`;
-            btn.className = "mt-8 w-full bg-slate-200 text-slate-400 font-bold py-3.5 px-4 rounded-xl cursor-not-allowed";
+            if (!globalCaseNo) {
+              globalCaseNo = getCaseNoFromUrl();
+            }
+
+            if (!globalCaseNo) {
+              clearTimeout(timeoutTimer);
+              showError('錯誤：網址缺少案件編號 (caseNo) 參數，無法讀取資料。');
+              return;
+            }
+            
+            // 🚀 【升級】：捨棄 google.script.run，改用標準 fetch API (GET) 呼叫後端
+            const reqUrl = `${WEB_APP_URL}?action=getCaseDetails&caseNo=${encodeURIComponent(globalCaseNo)}`;
+            
+            fetch(reqUrl)
+              .then(response => {
+                if (!response.ok) throw new Error('HTTP status ' + response.status);
+                return response.json();
+              })
+              .then(result => {
+                clearTimeout(timeoutTimer);
+                document.getElementById('loading').classList.add('hidden');
+                if (result.success) {
+                  renderCase(result);
+                } else {
+                  showError('資料庫查詢失敗：' + result.message);
+                }
+              })
+              .catch(err => {
+                clearTimeout(timeoutTimer);
+                document.getElementById('loading').classList.add('hidden');
+                showError('API 請求連線失敗：' + err.toString());
+              });
           }
-        } else {
-          alert("讀取案件失敗：" + currentCase.message);
+        })
+        .catch(err => {
+          clearTimeout(timeoutTimer);
+          showError('LIFF 初始化失敗：' + err.message);
+        });
+    };
+
+    // 渲染工單到畫面上
+    function renderCase(c) {
+      document.getElementById('case-content').classList.remove('hidden');
+      
+      globalCategory = c.category;
+      globalLocation = c.location;
+
+      document.getElementById('case-no').innerText = c.caseNo;
+      document.getElementById('case-time').innerText = c.time;
+      document.getElementById('case-category').innerText = c.category;
+      document.getElementById('case-location').innerText = c.location;
+      document.getElementById('case-desc').innerText = c.description;
+
+      const badge = document.getElementById('badge-status');
+      badge.innerText = c.status;
+
+      if (c.photoUrl && c.photoUrl !== '無照片' && c.photoUrl !== '儲存失敗') {
+        document.getElementById('pre-photo-container').classList.remove('hidden');
+        document.getElementById('pre-photo-link').href = c.photoUrl;
+      }
+
+      if (c.status === '待指派' || c.status === '⏳ 待處理') {
+        badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-800";
+        document.getElementById('section-assign').classList.remove('hidden');
+      } else if (c.status === '已指派') {
+        badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-800";
+        document.getElementById('section-complete').classList.remove('hidden');
+        document.getElementById('label-assignee').innerText = c.assignee;
+      } else if (c.status === '已結案') {
+        badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-green-100 text-green-800";
+        document.getElementById('section-archive').classList.remove('hidden');
+        document.getElementById('archive-assignee').innerText = c.assignee;
+        document.getElementById('archive-time').innerText = c.completeTime;
+        document.getElementById('archive-desc').innerText = c.completeDesc;
+        if (c.completePhotoUrl && c.completePhotoUrl !== '無照片') {
+          document.getElementById('archive-photo-container').classList.remove('hidden');
+          document.getElementById('archive-photo-link').href = c.completePhotoUrl;
         }
-      } catch (err) {
-        alert("LIFF 載入發生異常: " + err);
       }
     }
 
-    // 觸發搶單鎖定與直接分享功能
-    async function startAssignment() {
-      const btn = document.getElementById('assignBtn');
+    // 主管：指派維修人並喚起好友分享
+    function handleAssign() {
+      const assigneeName = document.getElementById('assignee-name').value.trim();
+      if (!assigneeName) {
+        alert('請先輸入指派同仁的姓名！');
+        return;
+      }
+
+      const btn = document.getElementById('btn-assign');
       btn.disabled = true;
-      btn.innerText = "正在進行行號鎖定與同步...";
+      btn.innerText = '正在指派中...';
 
-      try {
-        // A. 前往後端 GAS 爭奪控制權（防搶單鎖定機制）
-        const res = await fetch(`${GAS_WEBAPP_URL}?action=assignCase&caseId=${currentCase.caseId}&adminName=${encodeURIComponent(adminProfile.displayName)}`);
-        const result = await res.json();
+      // 🚀 【升級】：改用標準 fetch API (GET) 提交指派
+      const reqUrl = `${WEB_APP_URL}?action=assignCase&caseNo=${encodeURIComponent(globalCaseNo)}&assigneeName=${encodeURIComponent(assigneeName)}`;
 
-        if (!result.success) {
-          alert("❌ " + result.message);
-          window.location.reload(); // 搶單失敗，自動重整刷新最新狀態
-          return;
-        }
+      fetch(reqUrl)
+        .then(response => {
+          if (!response.ok) throw new Error('HTTP status ' + response.status);
+          return response.json();
+        })
+        .then(res => {
+          if (res.success) {
+            if (liff.isApiAvailable('shareTargetPicker')) {
+              
+              const sharedLiffUrl = "https://liff.line.me/" + LIFF_ID + "?caseNo=" + encodeURIComponent(globalCaseNo);
 
-        // B. 鎖定成功，直接叫出 LINE 內建的多人分享視窗
-        if (liff.isApiAvailable('shareTargetPicker')) {
-          const sendResult = await liff.shareTargetPicker([
-            {
-              "type": "flex",
-              "altText": "🛠️ 收到全新派工任務通知！",
-              "contents": {
-                "type": "bubble",
-                "styles": { "header": { "backgroundColor": "#1b5e20" } }, // 指派給基層同仁的綠色卡片
-                "header": {
-                  "type": "box", "layout": "vertical",
-                  "contents": [{ "type": "text", "text": "🛠️ 任務指派通知", "textColor": "#FFFFFF", "weight": "bold", "size": "lg" }]
-                },
-                "body": {
-                  "type": "box", "layout": "vertical", "spacing": "md",
-                  "contents": [
-                    { "type": "text", "text": "請指定負責人前往現場處理，並在處理完成後點擊下方按鈕進行完工回報：", "size": "sm", "color": "#555555", "wrap": true },
-                    { "type": "separator" },
-                    { "type": "text", "text": `案件編號: ${currentCase.caseId}`, "weight": "bold", "size": "md" },
-                    {
-                      "type": "box", "layout": "grid", "columns": "2",
+              liff.shareTargetPicker([
+                {
+                  "type": "flex",
+                  "altText": "🛠️ 您收到一項維修指派任務",
+                  "contents": {
+                    "type": "bubble",
+                    "body": {
+                      "type": "box", "layout": "vertical",
                       "contents": [
-                        { "type": "text", "text": "位置：", "color": "#888888", "size": "sm" },
-                        { "type": "text", "text": currentCase.location, "size": "sm", "wrap": true },
-                        { "type": "text", "text": "分類：", "color": "#888888", "size": "sm" },
-                        { "type": "text", "text": currentCase.category, "size": "sm" },
-                        { "type": "text", "text": "描述：", "color": "#888888", "size": "sm" },
-                        { "type": "text", "text": currentCase.desc, "size": "sm", "wrap": true }
+                        { "type": "text", "text": "🛠️ 收到維修指派通知", "weight": "bold", "size": "xl", "color": "#1A73E8" },
+                        { "type": "separator", "margin": "md" },
+                        {
+                          "type": "box", "layout": "vertical", "margin": "lg", "spacing": "sm",
+                          "contents": [
+                            { "type": "box", "layout": "baseline", "spacing": "sm", "contents": [{ "type": "text", "text": "案件編號", "color": "#aaaaaa", "size": "sm", "flex": 2 }, { "type": "text", "text": globalCaseNo, "wrap": true, "color": "#666666", "size": "sm", "flex": 5 }] },
+                            { "type": "box", "layout": "baseline", "spacing": "sm", "contents": [{ "type": "text", "text": "問題分類", "color": "#aaaaaa", "size": "sm", "flex": 2 }, { "type": "text", "text": globalCategory, "wrap": true, "color": "#666666", "size": "sm", "flex": 5 }] },
+                            { "type": "box", "layout": "baseline", "spacing": "sm", "contents": [{ "type": "text", "text": "故障位置", "color": "#aaaaaa", "size": "sm", "flex": 2 }, { "type": "text", "text": globalLocation, "wrap": true, "color": "#2B6CB0", "weight": "bold", "size": "sm", "flex": 5 }] },
+                            { "type": "box", "layout": "vertical", "margin": "md", "contents": [{ "type": "text", "text": "負責人員", "color": "#aaaaaa", "size": "sm" }, { "type": "text", "text": assigneeName, "wrap": true, "color": "#333333", "size": "sm", "margin": "xs" }] }
+                          ]
+                        }
+                      ]
+                    },
+                    "footer": {
+                      "type": "box", "layout": "vertical",
+                      "contents": [
+                        {
+                          "type": "button", "style": "primary", "color": "#1A73E8",
+                          "action": {
+                            "type": "uri", "label": "👉 前往處理與完工回報",
+                            "uri": sharedLiffUrl
+                          }
+                        }
                       ]
                     }
-                  ]
+                  }
                 },
-                "footer": {
-                  "type": "box", "layout": "vertical",
-                  "contents": [{
-                    "type": "button", "style": "primary", "color": "#2e7d32",
-                    "action": { "type": "message", "label": "🏁 前往完工回報流程", "text": `完工回報 ${currentCase.caseId}` }
-                  }]
+                {
+                  "type": "text",
+                  "text": "🔗 同仁專屬完工回報網址：\n" + sharedLiffUrl
                 }
-              }
+              ]).then(function(resShare) {
+                if (resShare) {
+                  alert('指派成功，並已成功分享卡片至維修同仁！');
+                } else {
+                  alert('系統已登記指派為：' + assigneeName + '，但您剛才取消了分享傳送。');
+                }
+                liff.closeWindow();
+              }).catch(function(errShare) {
+                alert('系統指派成功！但分享傳送失敗：' + errShare.message + '\n請確認您已在 LINE Console 啟用 Share Target Picker 功能。');
+                liff.closeWindow();
+              });
+            } else {
+              alert('指派成功！但目前執行環境不支援選擇好友分享。');
+              liff.closeWindow();
             }
-          ]);
-
-          if (sendResult) {
-            alert("🎉 任務卡片已成功完成直接分享！");
-            liff.closeWindow(); 
           } else {
-            alert("您取消了發送，但系統後台已登錄您為此單指派主管。");
-            liff.closeWindow();
+            alert('指派失敗：' + res.message);
+            btn.disabled = false;
+            btn.innerText = '確認指派並分享給維修同仁';
           }
-        } else {
-          alert("當前 LINE 版本不支援直接分享功能。");
-        }
-      } catch (error) {
-        alert("派工過程發生錯誤: " + error);
-      } finally {
-        btn.disabled = false;
-        btn.innerText = "🚀 確定指派 (直接分享至 LINE 聯絡人)";
-      }
+        })
+        .catch(err => {
+          alert('連線失敗：' + err.toString());
+          btn.disabled = false;
+          btn.innerText = '確認指派並分享給維修同仁';
+        });
     }
 
-    window.onload = initLiff;
+    // 維修同仁：完工回報
+    function handleComplete() {
+      const repairDesc = document.getElementById('repair-desc').value.trim();
+      const fileInput = document.getElementById('complete-file');
+      
+      if (!repairDesc) {
+        alert('請填寫維修成果描述！');
+        return;
+      }
+      if (fileInput.files.length === 0) {
+        alert('請拍攝並上傳一張完工後的現場對照照片！');
+        return;
+      }
+
+      const btn = document.getElementById('btn-complete');
+      btn.disabled = true;
+      btn.innerText = '壓縮照片並提交中...';
+
+      const file = fileInput.files[0];
+      document.getElementById('compressing-msg').classList.remove('hidden');
+
+      compressImage(file, function(base64Image) {
+        document.getElementById('compressing-msg').classList.add('hidden');
+        
+        // 🚀 【升級】：大檔案改用標準 fetch API (POST) 送至後端 doPost 進行解析儲存
+        const payload = {
+          action: 'completeCase',
+          caseNo: globalCaseNo,
+          repairDesc: repairDesc,
+          photoBase64: base64Image
+        };
+
+        fetch(WEB_APP_URL, {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        })
+        .then(response => {
+          if (!response.ok) throw new Error('HTTP status ' + response.status);
+          return response.json();
+        })
+        .then(res => {
+          if (res.success) {
+            alert('完工結案申報成功！感謝您的付出。');
+            liff.closeWindow();
+          } else {
+            alert('結案失敗：' + res.message);
+            btn.disabled = false;
+            btn.innerText = '提交完工結案';
+          }
+        })
+        .catch(err => {
+          alert('連線失敗：' + err.toString());
+          btn.disabled = false;
+          btn.innerText = '提交完工結案';
+        });
+      });
+    }
+
+    // HTML5 Canvas 前端壓縮圖片
+    function compressImage(file, callback) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          
+          const max_size = 1024;
+          if (width > height) {
+            if (width > max_size) {
+              height *= max_size / width;
+              width = max_size;
+            }
+          } else {
+            if (height > max_size) {
+              width *= max_size / height;
+              height = max_size;
+            }
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+          callback(dataUrl);
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // 渲染除錯控制台
+    function showError(msg) {
+      document.getElementById('loading').classList.add('hidden');
+      const box = document.getElementById('error-box');
+      box.classList.remove('hidden');
+      document.getElementById('error-message').innerText = msg;
+
+      if (document.getElementById('debug-panel')) return;
+
+      const debugDiv = document.createElement('div');
+      debugDiv.id = "debug-panel";
+      debugDiv.className = "mt-4 p-4 bg-gray-900 text-gray-200 text-[10px] text-left font-mono rounded-lg overflow-x-auto space-y-1.5 border border-gray-700 shadow-inner";
+      debugDiv.innerHTML = `
+        <div class="text-amber-400 font-bold border-b border-gray-700 pb-1 mb-1 flex justify-between">
+          <span>🔍 系統排查對照面板 (Debug Console)</span>
+          <span class="text-gray-500">v3.0 - API 版</span>
+        </div>
+        <div><strong>[1] 預期產生之 LIFF 網址:</strong><br><span class="text-blue-300">https://liff.line.me/${LIFF_ID}?caseNo=...</span></div>
+        <div class="mt-2"><strong>[2] 瀏覽器實體網址 (window.location.href):</strong><br><span class="text-green-400 break-all">${window.location.href}</span></div>
+        <div class="mt-2"><strong>[3] 伺服器端解析 (serverParsedCaseNo):</strong> <span class="text-red-400 font-bold">${serverParsedCaseNo || '無 (Null)'}</span></div>
+        <div><strong>[4] 瀏覽器端解析 (getCaseNoFromUrl):</strong> <span class="text-red-400 font-bold">${getCaseNoFromUrl() || '無 (Null)'}</span></div>
+      `;
+      box.appendChild(debugDiv);
+    }
   </script>
 </body>
 </html>
