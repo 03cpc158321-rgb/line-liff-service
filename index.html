@@ -56,13 +56,13 @@
           <label class="text-xs text-gray-400">損壞描述</label>
           <div class="text-sm text-gray-600 bg-gray-50 p-2.5 rounded-lg border border-gray-100" id="case-desc"></div>
         </div>
-        <div id="pre-photo-container" class="hidden">
-          <label class="text-xs text-gray-400">報修前佐證照片</label>
-          <a id="pre-photo-link" href="#" target="_blank" class="block mt-1">
-            <div class="bg-gray-100 text-blue-600 text-xs p-2 text-center rounded-lg border border-dashed border-blue-400 hover:bg-blue-50">
-              🖼️ 點此在新視窗查看報修照片
-            </div>
-          </a>
+        
+        <!-- 🚀 【嵌入式優化一】：報修前佐證檔案直接在網頁內加載播放 -->
+        <div id="pre-photo-container" class="hidden space-y-1">
+          <label class="text-xs text-gray-400">報修前佐證檔案 (照片/影片)</label>
+          <div class="rounded-lg overflow-hidden border border-gray-200 bg-black mt-1">
+            <iframe id="pre-photo-iframe" src="" width="100%" height="240" frameborder="0" allow="autoplay" class="block"></iframe>
+          </div>
         </div>
       </div>
 
@@ -94,6 +94,7 @@
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">拍攝/上傳完工照片 (選填)：</label>
+          <!-- 🚀 【功能優化】：不使用 capture 屬性，同仁可自由選取相簿照片或直接拍攝 -->
           <input type="file" id="complete-file" accept="image/*" class="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
           <div id="compressing-msg" class="hidden text-xs text-amber-600 mt-2 font-mono bg-amber-50 p-2 rounded border border-amber-200 animate-pulse">⚙️ 正在進行高解析度照片壓縮優化...</div>
         </div>
@@ -119,13 +120,13 @@
           <label class="text-xs text-gray-400">維修成果描述</label>
           <div class="text-sm text-gray-600 bg-gray-50 p-2 rounded-lg border" id="archive-desc"></div>
         </div>
-        <div id="archive-photo-container" class="hidden">
-          <label class="text-xs text-gray-400">完工對照照片</label>
-          <a id="archive-photo-link" href="#" target="_blank" class="block mt-1">
-            <div class="bg-gray-100 text-green-600 text-xs p-2 text-center rounded-lg border border-dashed border-green-400 hover:bg-green-50">
-              🖼️ 點此在新視窗查看完工照
-            </div>
-          </a>
+        
+        <!-- 🚀 【嵌入式優化二】：完工對照檔案直接在網頁內加載播放 -->
+        <div id="archive-photo-container" class="hidden space-y-1">
+          <label class="text-xs text-gray-400">完工對照檔案 (照片/影片)</label>
+          <div class="rounded-lg overflow-hidden border border-gray-200 bg-black mt-1">
+            <iframe id="archive-photo-iframe" src="" width="100%" height="240" frameborder="0" allow="autoplay" class="block"></iframe>
+          </div>
         </div>
       </div>
 
@@ -147,6 +148,14 @@
       showError('JavaScript 執行錯誤: ' + message + ' (第 ' + lineno + ' 行)');
       return false;
     };
+
+    // 🚀 【新增】：轉換 Google Drive 分享網址為標準嵌入式預覽網址 (支援相片/影片)
+    function getGoogleDrivePreviewUrl(url) {
+      if (!url || url.indexOf('http') !== 0) return '';
+      let previewUrl = url.replace('/view', '/preview');
+      previewUrl = previewUrl.split('?')[0]; // 過濾多餘參數，保持網址精簡
+      return previewUrl;
+    }
 
     // 瀏覽器端擷取參數
     function getCaseNoFromUrl() {
@@ -245,9 +254,10 @@
       const badge = document.getElementById('badge-status');
       badge.innerText = c.status;
 
-      if (c.photoUrl && c.photoUrl !== '無照片' && c.photoUrl !== '儲存失敗') {
+      // 🚀 【嵌入式優化一】：報修前檔案直接加載於 Iframe 中，免去跳轉
+      if (c.photoUrl && c.photoUrl !== '無照片' && c.photoUrl !== '儲存失敗' && c.photoUrl.indexOf('儲存失敗') === -1) {
         document.getElementById('pre-photo-container').classList.remove('hidden');
-        document.getElementById('pre-photo-link').href = c.photoUrl;
+        document.getElementById('pre-photo-iframe').src = getGoogleDrivePreviewUrl(c.photoUrl);
       }
 
       if (c.status === '待指派' || c.status === '⏳ 待處理') {
@@ -263,9 +273,11 @@
         document.getElementById('archive-assignee').innerText = c.assignee;
         document.getElementById('archive-time').innerText = c.completeTime;
         document.getElementById('archive-desc').innerText = c.completeDesc;
-        if (c.completePhotoUrl && c.completePhotoUrl !== '無照片') {
+        
+        // 🚀 【嵌入式優化二】：完工對照檔案直接加載於 Iframe 中，免去跳轉
+        if (c.completePhotoUrl && c.completePhotoUrl !== '無照片' && c.completePhotoUrl !== '儲存失敗' && c.completePhotoUrl.indexOf('儲存失敗') === -1) {
           document.getElementById('archive-photo-container').classList.remove('hidden');
-          document.getElementById('archive-photo-link').href = c.completePhotoUrl;
+          document.getElementById('archive-photo-iframe').src = getGoogleDrivePreviewUrl(c.completePhotoUrl);
         }
       }
     }
@@ -296,10 +308,6 @@
               
               const sharedLiffUrl = "https://liff.line.me/" + LIFF_ID + "?caseNo=" + encodeURIComponent(globalCaseNo || "");
 
-              // 🚀 【強固核心修正】：
-              // 1. 將第二條純文字網址徹底移除，使畫面最乾淨。
-              // 2. 使用 100% 被 LINE 伺服器接受的單層扁平縱向佈局（無 nested box）。
-              // 3. 補上「問題描述」欄位。
               liff.shareTargetPicker([
                 {
                   "type": "flex",
@@ -337,7 +345,6 @@
                           "color": "#2B6CB0",
                           "weight": "bold"
                         },
-                        // 🚀 【調整五】：在扁平縱向清單中，安全呈現「問題描述」
                         {
                           "type": "text",
                           "text": "問題描述: " + String(globalDescription || "無描述"),
@@ -416,7 +423,7 @@
 
       const file = fileInput.files[0];
       
-      // 🚀 【調整二】：選填完工照。若有選取檔案則執行壓縮，否則直接空字串結案上傳
+      // 🚀 選填完工照：若有選取檔案則壓縮，否則直接空字串結案上傳
       if (file) {
         compressImage(file, function(base64Image) {
           sendCompletionToServer(repairDesc, base64Image, btn);
