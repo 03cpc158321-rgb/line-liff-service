@@ -32,6 +32,14 @@
     <!-- 案件詳細內容主容器 (預設隱藏) -->
     <div id="case-content" class="hidden space-y-4">
       
+      <!-- 🚀 【嵌入優化】：檢視者提示區 (預設隱藏，非管理主管開啟「待處理」時自動動態浮現，去警示字眼) -->
+      <div id="viewer-notice" class="hidden bg-blue-50 border border-blue-100 text-blue-800 text-xs rounded-xl p-4 shadow-sm space-y-1">
+        <p class="font-bold flex items-center text-blue-900">
+          <span class="mr-1">ℹ️</span> 廠務工單狀態說明
+        </p>
+        <p id="viewer-notice-text">本工單目前為【待指派/已指派】狀態，維修程序已啟動。此畫面僅供檢視工單進度與內容。</p>
+      </div>
+
       <!-- 案件詳情卡片 -->
       <div class="bg-white rounded-xl p-5 shadow-sm space-y-3">
         <div class="flex justify-between items-center border-b pb-2">
@@ -57,7 +65,7 @@
           <div class="text-sm text-gray-600 bg-gray-50 p-2.5 rounded-lg border border-gray-100" id="case-desc"></div>
         </div>
         
-        <!-- 🚀 【嵌入式優化一】：報修前檔案直接在網頁內加載播放 -->
+        <!-- 【嵌入式優化一】：報修前檔案直接在網頁內加載播放 -->
         <div id="pre-photo-container" class="hidden space-y-1">
           <label class="text-xs text-gray-400">報修前佐證檔案 (照片/影片)</label>
           <div class="rounded-lg overflow-hidden border border-gray-200 bg-black mt-1">
@@ -94,6 +102,7 @@
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">拍攝/上傳完工照片 (選填)：</label>
+          <!-- 🚀 已移除 capture="environment"，同仁可自由選取相簿照片或直接拍攝 -->
           <input type="file" id="complete-file" accept="image/*" class="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
           <div id="compressing-msg" class="hidden text-xs text-amber-600 mt-2 font-mono bg-amber-50 p-2 rounded border border-amber-200 animate-pulse">⚙️ 正在進行高解析度照片壓縮優化...</div>
         </div>
@@ -120,7 +129,7 @@
           <div class="text-sm text-gray-600 bg-gray-50 p-2 rounded-lg border" id="archive-desc"></div>
         </div>
         
-        <!-- 🚀 【嵌入式優化二】：完工對照檔案直接在網頁內加載播放 -->
+        <!-- 【嵌入式優化二】：完工對照檔案直接在網頁內加載播放 -->
         <div id="archive-photo-container" class="hidden space-y-1">
           <label class="text-xs text-gray-400">完工對照檔案 (照片/影片)</label>
           <div class="rounded-lg overflow-hidden border border-gray-200 bg-black mt-1">
@@ -141,7 +150,7 @@
     let globalCategory = "";
     let globalLocation = "";
     let globalDescription = ""; // 原始問題描述
-    let globalPhotoUrl = "";    // 🚀 【新增】：用於指派同仁卡片時提取 Hero 縮圖用的全域報修照 URL
+    let globalPhotoUrl = "";    // 用於分享卡片時提取縮圖
 
     // 全域錯誤監聽
     window.onerror = function(message, source, lineno, colno, error) {
@@ -149,14 +158,14 @@
       return false;
     };
 
-    // 🚀 【新增】：自動提取 File ID 函數 (供前端分享卡片使用)
+    // 自動提取 File ID 函數 (供前端分享卡片使用)
     function getDriveFileId(url) {
       if (!url || url.indexOf('http') !== 0) return null;
       var match = url.match(/\/file\/d\/([^\/]+)/) || url.match(/[?&]id=([^&]+)/);
       return (match && match[1]) ? match[1] : null;
     }
 
-    // 🚀 【新增】：轉換 Google Drive 分享網址為標準嵌入式預覽網址
+    // 轉換 Google Drive 網址為標準預覽網址
     function getGoogleDrivePreviewUrl(url) {
       if (!url || url.indexOf('http') !== 0) return '';
       let previewUrl = url.replace('/view', '/preview');
@@ -183,6 +192,24 @@
         }
       }
       return null;
+    }
+
+    // 🚀 【新增】：解碼獲取 A 專用權限參數（auth=assignee）
+    function getAuthParamFromUrl() {
+      const urlParams = new URLSearchParams(window.location.search);
+      let auth = urlParams.get('auth');
+      if (!auth) {
+        const liffState = urlParams.get('liff.state');
+        if (liffState) {
+          try {
+            const decodedState = decodeURIComponent(liffState);
+            const stateQuery = decodedState.includes('?') ? decodedState.split('?')[1] : decodedState;
+            const stateParams = new URLSearchParams(stateQuery);
+            auth = stateParams.get('auth');
+          } catch (e) {}
+        }
+      }
+      return auth;
     }
 
     // 初始化 LIFF
@@ -214,8 +241,10 @@
               return;
             }
             
-            // 呼叫後端 API
-            const reqUrl = `${WEB_APP_URL}?action=getCaseDetails&caseNo=${encodeURIComponent(globalCaseNo)}`;
+            // 🚀 【權限防禦升級】：將目前開啟網頁之人的 LINE ID 一併送往 GAS 比對是否有管理員權限
+            const context = liff.getContext();
+            const viewerUserId = context ? (context.userId || "") : "";
+            const reqUrl = `${WEB_APP_URL}?action=getCaseDetails&caseNo=${encodeURIComponent(globalCaseNo)}&userId=${encodeURIComponent(viewerUserId)}`;
             
             fetch(reqUrl)
               .then(response => {
@@ -244,14 +273,14 @@
         });
     };
 
-    // 渲染工單到畫面上
+    // 🚀 【全新重構】：網頁渲染邏輯 (一站式權限分流判斷)
     function renderCase(c) {
       document.getElementById('case-content').classList.remove('hidden');
       
       globalCategory = c.category;
       globalLocation = c.location;
       globalDescription = c.description; // 原始報修描述
-      globalPhotoUrl = c.photoUrl;        // 🚀 保存報修相片連結
+      globalPhotoUrl = c.photoUrl;        // 保存報修相片連結
 
       document.getElementById('case-no').innerText = c.caseNo;
       document.getElementById('case-time').innerText = c.time;
@@ -262,31 +291,70 @@
       const badge = document.getElementById('badge-status');
       badge.innerText = c.status;
 
-      // 🚀 【嵌入式優化一】：報修前檔案直接在 Iframe 內展示預覽
+      // 載入報修預覽圖
       if (c.photoUrl && c.photoUrl !== '無照片' && c.photoUrl !== '儲存失敗' && c.photoUrl.indexOf('儲存失敗') === -1) {
         document.getElementById('pre-photo-container').classList.remove('hidden');
         document.getElementById('pre-photo-iframe').src = getGoogleDrivePreviewUrl(c.photoUrl);
       }
 
-      if (c.status === '待指派' || c.status === '⏳ 待處理') {
-        badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-800";
-        document.getElementById('section-assign').classList.remove('hidden');
-      } else if (c.status === '已指派') {
-        badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-800";
-        document.getElementById('section-complete').classList.remove('hidden');
-        document.getElementById('label-assignee').innerText = c.assignee;
-      } else if (c.status === '已結案') {
-        badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-green-100 text-green-800";
-        document.getElementById('section-archive').classList.remove('hidden');
-        document.getElementById('archive-assignee').innerText = c.assignee;
-        document.getElementById('archive-time').innerText = c.completeTime;
-        document.getElementById('archive-desc').innerText = c.completeDesc;
-        
-        // 🚀 【嵌入式優化二】：完工對照檔案直接在 Iframe 內展示預覽
-        if (c.completePhotoUrl && c.completePhotoUrl !== '無照片' && c.completePhotoUrl !== '儲存失敗' && c.completePhotoUrl.indexOf('儲存失敗') === -1) {
-          document.getElementById('archive-photo-container').classList.remove('hidden');
-          document.getElementById('archive-photo-iframe').src = getGoogleDrivePreviewUrl(c.completePhotoUrl);
+      // 初始化先將所有操作面板完全隱藏
+      document.getElementById('section-assign').classList.add('hidden');
+      document.getElementById('section-complete').classList.add('hidden');
+      document.getElementById('section-archive').classList.add('hidden');
+      document.getElementById('viewer-notice').classList.add('hidden');
+
+      // 🚀 【捷徑與密鑰權限比對分流】
+      const hasAssigneeAuth = (getAuthParamFromUrl() === 'assignee');
+
+      if (c.isAdmin) {
+        // A. 主管（管理者）檢視視角：看得到 Step 1 指派 或 Step 2 結案
+        if (c.status === '待指派' || c.status === '⏳ 待處理') {
+          badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-800";
+          document.getElementById('section-assign').classList.remove('hidden');
+        } else if (c.status === 'grid-cols-2' || c.status === '已指派') {
+          badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-800";
+          document.getElementById('section-complete').classList.remove('hidden');
+          document.getElementById('label-assignee').innerText = c.assignee;
+        } else if (c.status === '已結案') {
+          badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-green-100 text-green-800";
+          showArchivePanel(c);
         }
+      } else {
+        // B. 一般員工 / 現場人員 / 被指派同仁 檢視視角
+        if (c.status === '待指派' || c.status === '⏳ 待處理') {
+          // 🚀 隱藏指派面板，並浮現中性工單狀態提示
+          badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-800";
+          document.getElementById('viewer-notice').classList.remove('hidden');
+          document.getElementById('viewer-notice-text').innerText = "本工單目前為【待指派】狀態，維修程序已啟動。此處僅提供進度與內容檢視。";
+        } else if (c.status === '已指派') {
+          // 🚀 核心判定：若是已指派狀態，且使用者手持「auth=assignee」專屬連結，方可填寫並完工結案 [1.4.12]
+          if (hasAssigneeAuth) {
+            badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-800";
+            document.getElementById('section-complete').classList.remove('hidden');
+            document.getElementById('label-assignee').innerText = c.assignee;
+          } else {
+            // 普通同仁點進來（無 auth 參數），則顯示唯讀進度提示 [1.4.12]
+            badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-800";
+            document.getElementById('viewer-notice').classList.remove('hidden');
+            document.getElementById('viewer-notice-text').innerText = "本工單目前為【已指派】狀態，負責同仁正進行維修中。此處僅提供進度與內容檢視。";
+          }
+        } else if (c.status === '已結案') {
+          badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-green-100 text-green-800";
+          showArchivePanel(c);
+        }
+      }
+    }
+
+    // 輔助呈現已結案封存面板
+    function showArchivePanel(c) {
+      document.getElementById('section-archive').classList.remove('hidden');
+      document.getElementById('archive-assignee').innerText = c.assignee;
+      document.getElementById('archive-time').innerText = c.completeTime;
+      document.getElementById('archive-desc').innerText = c.completeDesc;
+      
+      if (c.completePhotoUrl && c.completePhotoUrl !== '無照片' && c.completePhotoUrl !== '儲存失敗' && c.completePhotoUrl.indexOf('儲存失敗') === -1) {
+        document.getElementById('archive-photo-container').classList.remove('hidden');
+        document.getElementById('archive-photo-iframe').src = getGoogleDrivePreviewUrl(c.completePhotoUrl);
       }
     }
 
@@ -314,9 +382,10 @@
           if (res.success) {
             if (liff.isApiAvailable('shareTargetPicker')) {
               
-              const sharedLiffUrl = "https://liff.line.me/" + LIFF_ID + "?caseNo=" + encodeURIComponent(globalCaseNo || "");
+              // 🚀 關鍵優化：指派給維修人員 A 的專屬連結會自動附加密鑰參數（&auth=assignee），供其回報完工 [1.4.12]
+              const sharedLiffUrl = "https://liff.line.me/" + LIFF_ID + "?caseNo=" + encodeURIComponent(globalCaseNo || "") + "&auth=assignee";
 
-              // 🚀 【全新卡片重構】：指派同仁卡片也嵌入縮圖，點選圖片直接跳轉至 LIFF 回報頁
+              // 指派同仁卡片一站式重構 (移除文字網址、扁平化縱向佈局)
               var bubblePayload = {
                 "type": "bubble",
                 "body": {
@@ -325,7 +394,7 @@
                   "contents": [
                     {
                       "type": "text",
-                      "text": "🛠️ 收到維修指派通知",
+                      "text": "🛠️ 廠務維修派工通知",
                       "weight": "bold",
                       "size": "xl",
                       "color": "#1A73E8"
@@ -384,7 +453,7 @@
                 }
               };
 
-              // 🚀 核心優化：若原案有佐證相片/影片，分享卡片頂部也會動態自動生成預覽圖，點選圖片直接進入回報網頁
+              // 若原案有佐證相片/影片，分享卡片頂部也會動態自動生成預覽圖，點選圖片直接進入回報網頁
               var fileId = getDriveFileId(globalPhotoUrl);
               if (fileId) {
                 bubblePayload.hero = {
@@ -404,12 +473,12 @@
               liff.shareTargetPicker([
                 {
                   "type": "flex",
-                  "altText": "🛠️ 您收到一項維修指派任務",
+                  "altText": "🛠️ 廠務維修派工通知",
                   "contents": bubblePayload
                 }
               ]).then(function(resShare) {
                 if (resShare) {
-                  alert('指派成功，已成功發送維修卡片！');
+                  alert('指派成功，已成功發送維修任務卡片！');
                 } else {
                   alert('系統已登記指派為：' + assigneeName + '，但您未送出分享。');
                 }
@@ -435,7 +504,7 @@
         });
     }
 
-    // 維修同仁：完工回報 (防禦優化與選填照片版)
+    // 維修同仁：完工回報
     function handleComplete() {
       const repairDesc = document.getElementById('repair-desc').value.trim();
       const fileInput = document.getElementById('complete-file');
@@ -451,7 +520,6 @@
 
       const file = fileInput.files[0];
       
-      // 選填完工照：若有選取檔案則壓縮，否則直接空字串結案上傳
       if (file) {
         compressImage(file, function(base64Image) {
           sendCompletionToServer(repairDesc, base64Image, btn);
