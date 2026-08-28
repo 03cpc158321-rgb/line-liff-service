@@ -32,7 +32,7 @@
     <!-- 案件詳細內容主容器 (預設隱藏) -->
     <div id="case-content" class="hidden space-y-4">
       
-      <!-- 🚀 【嵌入優化】：檢視者提示區 (預設隱藏，非管理主管開啟「待處理」時自動動態浮現，去警示字眼) -->
+      <!-- 🚀 【檢視者中性提示區】：預設隱藏，非管理主管開啟「待處理」時自動動態浮現，去警示字眼 -->
       <div id="viewer-notice" class="hidden bg-blue-50 border border-blue-100 text-blue-800 text-xs rounded-xl p-4 shadow-sm space-y-1">
         <p class="font-bold flex items-center text-blue-900">
           <span class="mr-1">ℹ️</span> 廠務工單狀態說明
@@ -65,7 +65,7 @@
           <div class="text-sm text-gray-600 bg-gray-50 p-2.5 rounded-lg border border-gray-100" id="case-desc"></div>
         </div>
         
-        <!-- 【嵌入式優化一】：報修前檔案直接在網頁內加載播放 -->
+        <!-- 【嵌入式優化】：報修前檔案直接在網頁內加載播放 -->
         <div id="pre-photo-container" class="hidden space-y-1">
           <label class="text-xs text-gray-400">報修前佐證檔案 (照片/影片)</label>
           <div class="rounded-lg overflow-hidden border border-gray-200 bg-black mt-1">
@@ -102,7 +102,7 @@
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">拍攝/上傳完工照片 (選填)：</label>
-          <!-- 🚀 已移除 capture="environment"，同仁可自由選取相簿照片或直接拍攝 -->
+          <!-- 🚀 已移除 capture="environment"，支援相簿選圖 -->
           <input type="file" id="complete-file" accept="image/*" class="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
           <div id="compressing-msg" class="hidden text-xs text-amber-600 mt-2 font-mono bg-amber-50 p-2 rounded border border-amber-200 animate-pulse">⚙️ 正在進行高解析度照片壓縮優化...</div>
         </div>
@@ -129,7 +129,7 @@
           <div class="text-sm text-gray-600 bg-gray-50 p-2 rounded-lg border" id="archive-desc"></div>
         </div>
         
-        <!-- 【嵌入式優化二】：完工對照檔案直接在網頁內加載播放 -->
+        <!-- 【嵌入式優化】：完工對照檔案直接在網頁內加載播放 -->
         <div id="archive-photo-container" class="hidden space-y-1">
           <label class="text-xs text-gray-400">完工對照檔案 (照片/影片)</label>
           <div class="rounded-lg overflow-hidden border border-gray-200 bg-black mt-1">
@@ -158,7 +158,7 @@
       return false;
     };
 
-    // 自動提取 File ID 函數 (供前端分享卡片使用)
+    // 提取 File ID
     function getDriveFileId(url) {
       if (!url || url.indexOf('http') !== 0) return null;
       var match = url.match(/\/file\/d\/([^\/]+)/) || url.match(/[?&]id=([^&]+)/);
@@ -171,6 +171,24 @@
       let previewUrl = url.replace('/view', '/preview');
       previewUrl = previewUrl.split('?')[0]; 
       return previewUrl;
+    }
+
+    // 🚀 解碼獲取 A 專用權限參數（auth=assignee）
+    function getAuthParamFromUrl() {
+      const urlParams = new URLSearchParams(window.location.search);
+      let auth = urlParams.get('auth');
+      if (!auth) {
+        const liffState = urlParams.get('liff.state');
+        if (liffState) {
+          try {
+            const decodedState = decodeURIComponent(liffState);
+            const stateQuery = decodedState.includes('?') ? decodedState.split('?')[1] : decodedState;
+            const stateParams = new URLSearchParams(stateQuery);
+            auth = stateParams.get('auth');
+          } catch (e) {}
+        }
+      }
+      return auth;
     }
 
     // 瀏覽器端擷取參數
@@ -192,24 +210,6 @@
         }
       }
       return null;
-    }
-
-    // 🚀 【新增】：解碼獲取 A 專用權限參數（auth=assignee）
-    function getAuthParamFromUrl() {
-      const urlParams = new URLSearchParams(window.location.search);
-      let auth = urlParams.get('auth');
-      if (!auth) {
-        const liffState = urlParams.get('liff.state');
-        if (liffState) {
-          try {
-            const decodedState = decodeURIComponent(liffState);
-            const stateQuery = decodedState.includes('?') ? decodedState.split('?')[1] : decodedState;
-            const stateParams = new URLSearchParams(stateQuery);
-            auth = stateParams.get('auth');
-          } catch (e) {}
-        }
-      }
-      return auth;
     }
 
     // 初始化 LIFF
@@ -273,7 +273,7 @@
         });
     };
 
-    // 🚀 【全新重構】：網頁渲染邏輯 (一站式權限分流判斷)
+    // 🚀 【全新重構】：網頁渲染邏輯 (一站式權限分流與安全防禦判定)
     function renderCase(c) {
       document.getElementById('case-content').classList.remove('hidden');
       
@@ -311,7 +311,7 @@
         if (c.status === '待指派' || c.status === '⏳ 待處理') {
           badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-800";
           document.getElementById('section-assign').classList.remove('hidden');
-        } else if (c.status === 'grid-cols-2' || c.status === '已指派') {
+        } else if (c.status === '已指派') {
           badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-800";
           document.getElementById('section-complete').classList.remove('hidden');
           document.getElementById('label-assignee').innerText = c.assignee;
@@ -320,14 +320,14 @@
           showArchivePanel(c);
         }
       } else {
-        // B. 一般員工 / 現場人員 / 被指派同仁 檢視視角
+        // B. 一般員工 / 現場人員 / 被指派同仁 檢視視角 (中性化提示) [1.4.12]
         if (c.status === '待指派' || c.status === '⏳ 待處理') {
           // 🚀 隱藏指派面板，並浮現中性工單狀態提示
           badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-800";
           document.getElementById('viewer-notice').classList.remove('hidden');
-          document.getElementById('viewer-notice-text').innerText = "本工單目前為【待指派】狀態，維修程序已啟動。此處僅提供進度與內容檢視。";
+          document.getElementById('viewer-notice-text').innerText = "本工單目前為【待指派】狀態，維修程序已啟動。此畫面僅供檢視工單進度與內容。";
         } else if (c.status === '已指派') {
-          // 🚀 核心判定：若是已指派狀態，且使用者手持「auth=assignee」專屬連結，方可填寫並完工結案 [1.4.12]
+          // 🚀 關鍵判定：若是已指派狀態，且使用者手持「auth=assignee」專屬連結，方可填寫並完工結案 [1.4.12]
           if (hasAssigneeAuth) {
             badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-800";
             document.getElementById('section-complete').classList.remove('hidden');
@@ -385,7 +385,7 @@
               // 🚀 關鍵優化：指派給維修人員 A 的專屬連結會自動附加密鑰參數（&auth=assignee），供其回報完工 [1.4.12]
               const sharedLiffUrl = "https://liff.line.me/" + LIFF_ID + "?caseNo=" + encodeURIComponent(globalCaseNo || "") + "&auth=assignee";
 
-              // 指派同仁卡片一站式重構 (移除文字網址、扁平化縱向佈局)
+              // 指派同仁卡片一站式重構 (字眼中性化、移除文字網址、扁平化縱向佈局)
               var bubblePayload = {
                 "type": "bubble",
                 "body": {
