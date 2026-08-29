@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>廠務異常通報檢視系統</title>
+  <!-- 導入 Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 導入 LINE LIFF SDK -->
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen text-gray-800">
+  
+  <div class="max-w-md mx-auto p-4">
+    <!-- 標題欄 (調整為中性名稱) -->
+    <div class="bg-gradient-to-r from-amber-500 to-orange-600 rounded-xl p-4 text-white shadow-md mb-4 text-center">
+      <h1 class="text-xl font-bold">⚠️ 廠務異常通報檢視系統</h1>
+      <p class="text-xs opacity-90 mt-1">現場狀況 ‧ 即時進度 ‧ 安全透明</p>
+    </div>
+
+    <!-- 載入中骨架 -->
+    <div id="loading" class="bg-white rounded-xl p-6 shadow-sm text-center">
+      <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-500 mx-auto"></div>
+      <p class="text-sm text-gray-500 mt-3">正在讀取通報詳情，請稍候...</p>
+    </div>
+
+    <!-- 異常提示 -->
+    <div id="error-box" class="hidden bg-red-50 border border-red-200 text-red-600 rounded-xl p-6 shadow-sm text-center">
+      <p id="error-message" class="font-medium"></p>
+    </div>
+
+    <!-- 案件詳細內容主容器 (預設隱藏) -->
+    <div id="case-content" class="hidden space-y-4">
+      
+      <!-- 區段一：案件詳情卡片 (唯讀) -->
+      <div class="bg-white rounded-xl p-5 shadow-sm space-y-3">
+        <div class="flex justify-between items-center border-b pb-2">
+          <span class="text-xs font-semibold px-2.5 py-1 rounded-full" id="badge-status">狀態</span>
+          <span class="text-xs text-gray-400" id="case-time">報修時間</span>
+        </div>
+        <div>
+          <label class="text-xs text-gray-400">案件編號</label>
+          <div class="font-mono text-sm font-bold text-gray-700" id="case-no"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="text-xs text-gray-400">問題分類</label>
+            <div class="text-sm font-semibold" id="case-category"></div>
+          </div>
+          <div>
+            <label class="text-xs text-gray-400">通報位置</label>
+            <div class="text-sm font-semibold text-orange-600" id="case-location"></div>
+          </div>
+        </div>
+        <div>
+          <label class="text-xs text-gray-400">狀況描述</label>
+          <div class="text-sm text-gray-600 bg-gray-50 p-2.5 rounded-lg border border-gray-100" id="case-desc"></div>
+        </div>
+        
+        <!-- 內嵌式佐證照片/影片播放器 -->
+        <div id="pre-photo-container" class="hidden space-y-1">
+          <label class="text-xs text-gray-400">現場佐證檔案 (照片/影片)</label>
+          <div class="rounded-lg overflow-hidden border border-gray-200 bg-black mt-1">
+            <iframe id="pre-photo-iframe" src="" width="100%" height="240" frameborder="0" allow="autoplay" class="block"></iframe>
+          </div>
+        </div>
+      </div>
+
+      <!-- 區段二：完工結案資訊面板 (唯讀，若狀態為「已結案」才會呈現) -->
+      <div id="section-archive" class="hidden bg-white rounded-xl p-5 shadow-sm space-y-3 border-t-4 border-green-500">
+        <h2 class="font-bold text-lg text-green-700 flex items-center">
+          <span class="bg-green-500 text-white p-1 rounded-md text-xs mr-2">OK</span>
+          案件已處理完成
+        </h2>
+        <div class="grid grid-cols-2 gap-2 text-xs border-b pb-2">
+          <div>
+            <span class="text-gray-400">維修人員：</span>
+            <span id="archive-assignee" class="font-semibold text-gray-700"></span>
+          </div>
+          <div>
+            <span class="text-gray-400">結案時間：</span>
+            <span id="archive-time" class="font-semibold text-gray-700"></span>
+          </div>
+        </div>
+        <div>
+          <label class="text-xs text-gray-400">維修成果說明</label>
+          <div class="text-sm text-gray-600 bg-gray-50 p-2 rounded-lg border border-gray-100" id="archive-desc"></div>
+        </div>
+        
+        <!-- 內嵌式完工對照照片/影片播放器 -->
+        <div id="archive-photo-container" class="hidden space-y-1">
+          <label class="text-xs text-gray-400">完工對照檔案 (照片/影片)</label>
+          <div class="rounded-lg overflow-hidden border border-gray-200 bg-black mt-1">
+            <iframe id="archive-photo-iframe" src="" width="100%" height="240" frameborder="0" allow="autoplay" class="block"></iframe>
+          </div>
+        </div>
+      </div>
+
+      <!-- 區段三：處理中進度提示 (唯讀，若狀態非已結案則呈現此進度) -->
+      <div id="section-processing" class="hidden bg-white rounded-xl p-5 shadow-sm text-center border-t-4 border-amber-500">
+        <div class="animate-pulse flex flex-col items-center space-y-2">
+          <div class="text-amber-600 font-bold text-base">⏳ 相關人員正在處理中</div>
+          <p class="text-xs text-gray-400">狀況已通報，請行經此區域的同仁注意安全。</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // 🛡️ 【請注意】：
+    // 1. 這裡的 LIFF_ID 請填入您稍後在 LINE Login 頻道中為 public.html 申請的「新 LIFF B ID」！
+    // 2. WEB_APP_URL 填入與之前完全相同的 GAS 網頁應用程式網址。
+    const LIFF_ID = "YOUR_LIFF_B_ID"; 
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwzWJT0vyvXd6Qn-4Iqoje7n04HsDEMcDt6D9LGcDuY3yIBUVg3b1Xy4SXBh1HpWEWHhg/exec"; 
+    
+    let globalCaseNo = ""; 
+
+    // 全域錯誤監聽
+    window.onerror = function(message, source, lineno, colno, error) {
+      showError('JavaScript 執行錯誤: ' + message + ' (第 ' + lineno + ' 行)');
+      return false;
+    };
+
+    // 轉換分享連結為標準嵌入式預覽網址
+    function getGoogleDrivePreviewUrl(url) {
+      if (!url || url.indexOf('http') !== 0) return '';
+      let previewUrl = url.replace('/view', '/preview');
+      previewUrl = previewUrl.split('?')[0]; 
+      return previewUrl;
+    }
+
+    // 瀏覽器端擷取參數
+    function getCaseNoFromUrl() {
+      const urlParams = new URLSearchParams(window.location.search);
+      let caseNo = urlParams.get('caseNo');
+      if (caseNo) return caseNo;
+      
+      const liffState = urlParams.get('liff.state');
+      if (liffState) {
+        try {
+          const decodedState = decodeURIComponent(liffState);
+          const stateQuery = decodedState.includes('?') ? decodedState.split('?')[1] : decodedState;
+          const stateParams = new URLSearchParams(stateQuery);
+          caseNo = stateParams.get('caseNo');
+          if (caseNo) return caseNo;
+        } catch (e) {
+          console.error("解析 liff.state 失敗:", e);
+        }
+      }
+      return null;
+    }
+
+    // 初始化 LIFF
+    window.onload = function() {
+      if (typeof liff === 'undefined') {
+        showError('⚠️ LINE LIFF SDK 載入失敗。\n這通常是因為網路防火牆限制。');
+        return;
+      }
+
+      const timeoutTimer = setTimeout(function() {
+        const loadingDiv = document.getElementById('loading');
+        if (!loadingDiv.classList.contains('hidden')) {
+          showError('⚠️ 讀取連線逾時，後端無回應。');
+        }
+      }, 6000);
+
+      liff.init({ liffId: LIFF_ID })
+        .then(() => {
+          if (!liff.isLoggedIn()) {
+            liff.login();
+          } else {
+            globalCaseNo = getCaseNoFromUrl();
+
+            if (!globalCaseNo) {
+              clearTimeout(timeoutTimer);
+              showError('錯誤：網址缺少案件編號 (caseNo) 參數，無法讀取資料。');
+              return;
+            }
+            
+            // 呼叫後端 API 讀取詳情
+            const reqUrl = `${WEB_APP_URL}?action=getCaseDetails&caseNo=${encodeURIComponent(globalCaseNo)}`;
+            
+            fetch(reqUrl)
+              .then(response => {
+                if (!response.ok) throw new Error('HTTP status ' + response.status);
+                return response.json();
+              })
+              .then(result => {
+                clearTimeout(timeoutTimer);
+                document.getElementById('loading').classList.add('hidden');
+                if (result.success) {
+                  renderCase(result);
+                } else {
+                  showError('資料庫查詢失敗：' + result.message);
+                }
+              })
+              .catch(err => {
+                clearTimeout(timeoutTimer);
+                document.getElementById('loading').classList.add('hidden');
+                showError('API 請求連線失敗：' + err.toString());
+              });
+          }
+        })
+        .catch(err => {
+          clearTimeout(timeoutTimer);
+          showError('LIFF 初始化失敗：' + err.message);
+        });
+    };
+
+    // 渲染工單到畫面上 (純唯讀呈現，無任何操作表單)
+    function renderCase(c) {
+      document.getElementById('case-content').classList.remove('hidden');
+
+      document.getElementById('case-no').innerText = c.caseNo;
+      document.getElementById('case-time').innerText = c.time;
+      document.getElementById('case-category').innerText = c.category;
+      document.getElementById('case-location').innerText = c.location;
+      document.getElementById('case-desc').innerText = c.description;
+
+      const badge = document.getElementById('badge-status');
+      badge.innerText = c.status;
+
+      // 載入報修照片/影片
+      if (c.photoUrl && c.photoUrl !== '無照片' && c.photoUrl !== '儲存失敗' && c.photoUrl.indexOf('儲存失敗') === -1) {
+        document.getElementById('pre-photo-container').classList.remove('hidden');
+        document.getElementById('pre-photo-iframe').src = getGoogleDrivePreviewUrl(c.photoUrl);
+      }
+
+      // 狀態分流 (隱藏所有輸入框與提交按鈕)
+      if (c.status === '待指派' || c.status === '⏳ 待處理') {
+        badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-800";
+        document.getElementById('section-processing').classList.remove('hidden');
+      } else if (c.status === '已指派') {
+        badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-800";
+        document.getElementById('section-processing').classList.remove('hidden');
+      } else if (c.status === '已結案') {
+        badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-green-100 text-green-800";
+        document.getElementById('section-archive').classList.remove('hidden');
+        document.getElementById('archive-assignee').innerText = c.assignee;
+        document.getElementById('archive-time').innerText = c.completeTime;
+        document.getElementById('archive-desc').innerText = c.completeDesc;
+        
+        // 載入完工照片/影片
+        if (c.completePhotoUrl && c.completePhotoUrl !== '無照片' && c.completePhotoUrl !== '儲存失敗' && c.completePhotoUrl.indexOf('儲存失敗') === -1) {
+          document.getElementById('archive-photo-container').classList.remove('hidden');
+          document.getElementById('archive-photo-iframe').src = getGoogleDrivePreviewUrl(c.completePhotoUrl);
+        }
+      }
+    }
+
+    function showError(msg) {
+      document.getElementById('loading').classList.add('hidden');
+      const box = document.getElementById('error-box');
+      box.classList.remove('hidden');
+      document.getElementById('error-message').innerText = msg;
+    }
+  </script>
+</body>
+</html>
